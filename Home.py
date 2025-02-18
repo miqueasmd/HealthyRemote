@@ -8,7 +8,7 @@ from utils.components import init_spotify_player
 
 # Page configuration
 st.set_page_config(
-    page_title="Remote Worker Wellness Platform",
+    page_title="Healthy Remote Wellness Platform",
     page_icon="🧘‍♂️",
     layout="wide",
     initial_sidebar_state="expanded"
