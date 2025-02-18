@@ -27,7 +27,7 @@ if 'authenticated' not in st.session_state:
 
 # Login/Signup System
 if not st.session_state.authenticated:
-    st.title("🧘‍♂️ Remote Worker Wellness Platform")
+    st.title("🧘‍♂️ Healthy Remote Wellness Platform")
 
     tab1, tab2 = st.tabs(["Login", "Sign Up"])
 
@@ -65,7 +65,7 @@ if not st.session_state.authenticated:
 
 else:
     # Main page layout for authenticated users
-    st.title("🧘‍♂️ Remote Worker Wellness Platform")
+    st.title("🧘‍♂️ Healthy Remote Wellness Platform")
 
     # Welcome message
     st.markdown("""
@@ -76,7 +76,8 @@ else:
     1. 📋 **Wellness Assessments** - Track your stress levels and physical health
     2. 📈 **Progress Tracking** - Monitor your wellness journey
     3. 📚 **Educational Resources** - Learn about maintaining a healthy remote work lifestyle
-
+    4. 🧘‍♂️ **Virtual Health Assistant** - Get personalized recommendations for your well-being
+    
     Get started by navigating to the Assessment section in the sidebar!
     """)
 
