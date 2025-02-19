@@ -4,8 +4,6 @@ from datetime import datetime
 import psycopg2
 from psycopg2.extras import RealDictCursor, Json
 
-# Add this at the top of the file
-DEFAULT_DB_URL = "postgresql://neondb_owner:npg_RAS5tzxGNUH1@ep-aged-mouse-a95y9tli-pooler.gwc.azure.neon.tech/neondb?sslmode=require"
 
 def get_user_by_email(email):
     """Get user by email address."""
