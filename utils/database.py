@@ -151,6 +151,9 @@ def init_db():
         conn.rollback()
         # Table already exists, skip creation
 
+    # Add this line to create the chat_history table
+    init_chat_table()
+
     conn.commit()
     cur.close()
     conn.close()
@@ -409,3 +412,44 @@ def get_user_data(user_id):
         'mobility_tests': get_mobility_tests(user_id),
         'active_challenges': get_active_challenges(user_id)
     }
+
+def save_chat_message(user_id: int, role: str, content: str):
+    """Save a chat message to the database"""
+    conn = get_db_connection()
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO chat_history (user_id, role, content)
+            VALUES (%s, %s, %s)
+            RETURNING id
+        """, (user_id, role, content))
+        message_id = cur.fetchone()['id']
+    conn.commit()
+    return message_id
+
+def get_chat_history(user_id: int, limit: int = 10):
+    """Get recent chat history for a user"""
+    conn = get_db_connection()
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT role, content, timestamp 
+            FROM chat_history 
+            WHERE user_id = %s 
+            ORDER BY timestamp DESC 
+            LIMIT %s
+        """, (user_id, limit))
+        return cur.fetchall()
+
+def init_chat_table():
+    """Initialize chat history table"""
+    conn = get_db_connection()
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS chat_history (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id),
+                role VARCHAR(50),
+                content TEXT,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+    conn.commit()

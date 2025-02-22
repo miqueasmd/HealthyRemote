@@ -3,8 +3,8 @@ load_dotenv()  # This must be before any other imports
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from utils.database import init_db, get_or_create_user, get_user_data, get_user_by_email, create_new_user
-from utils.components import init_spotify_player
+from utils.database import init_db, get_or_create_user, get_user_data, get_user_by_email, create_new_user, save_chat_message, get_chat_history
+from utils.components import init_spotify_player, get_ai_response  # Added get_ai_response here
 
 # Page configuration
 st.set_page_config(
@@ -111,6 +111,43 @@ else:
             st.info("👈 Start by taking your first assessment in the Assessment section!")
     except Exception as e:
         st.error(f"Error fetching user data: {e}")
+
+    # Chat Interface
+    st.header("💬 Chat with Your Wellness Assistant")
+
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+        # Load chat history from database
+        chat_history = get_chat_history(st.session_state.user_id)
+        for role, content, _ in reversed(chat_history):  # Reverse to show oldest first
+            st.session_state.messages.append({"role": role, "content": content})
+        
+        # If no history, create initial greeting
+        if not chat_history:
+            user_data = get_user_data(st.session_state.user_id)
+            initial_greeting = f"Hello {user_data.get('name', 'there')}! How can I help you with your wellness journey today?"
+            st.session_state.messages.append({"role": "assistant", "content": initial_greeting})
+            save_chat_message(st.session_state.user_id, "assistant", initial_greeting)
+
+    # Display chat messages
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    # Chat input
+    if prompt := st.chat_input("How can I help you today?"):
+        # Display user message
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        save_chat_message(st.session_state.user_id, "user", prompt)
+
+        # Get and display assistant response
+        with st.chat_message("assistant"):
+            response = get_ai_response(st.session_state.user_id, prompt)
+            st.markdown(response)
+        st.session_state.messages.append({"role": "assistant", "content": response})
+        save_chat_message(st.session_state.user_id, "assistant", response)
 
     # Footer
     st.markdown("---")
