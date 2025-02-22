@@ -24,6 +24,8 @@ if 'user_id' not in st.session_state:
     st.session_state.user_id = None
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
+if 'email' not in st.session_state:
+    st.session_state.email = None
 
 # Login/Signup System
 if not st.session_state.authenticated:
@@ -38,6 +40,7 @@ if not st.session_state.authenticated:
             user_id = get_user_by_email(login_email)
             if user_id:
                 st.session_state.user_id = user_id
+                st.session_state.email = login_email
                 st.session_state.authenticated = True
                 st.rerun()
             else:
@@ -111,51 +114,3 @@ else:
             st.info("👈 Start by taking your first assessment in the Assessment section!")
     except Exception as e:
         st.error(f"Error fetching user data: {e}")
-
-    # Chat Interface
-    st.header("💬 Chat with Your Wellness Assistant")
-
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-        # Load chat history from database
-        chat_history = get_chat_history(st.session_state.user_id)
-        for role, content, _ in reversed(chat_history):  # Reverse to show oldest first
-            st.session_state.messages.append({"role": role, "content": content})
-        
-        # If no history, create initial greeting
-        if not chat_history:
-            user_data = get_user_data(st.session_state.user_id)
-            initial_greeting = f"Hello {user_data.get('name', 'there')}! How can I help you with your wellness journey today?"
-            st.session_state.messages.append({"role": "assistant", "content": initial_greeting})
-            save_chat_message(st.session_state.user_id, "assistant", initial_greeting)
-
-    # Display chat messages
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    # Chat input
-    if prompt := st.chat_input("How can I help you today?"):
-        # Display user message
-        with st.chat_message("user"):
-            st.markdown(prompt)
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        save_chat_message(st.session_state.user_id, "user", prompt)
-
-        # Get and display assistant response
-        with st.chat_message("assistant"):
-            response = get_ai_response(st.session_state.user_id, prompt)
-            st.markdown(response)
-        st.session_state.messages.append({"role": "assistant", "content": response})
-        save_chat_message(st.session_state.user_id, "assistant", response)
-
-    # Footer
-    st.markdown("---")
-    st.markdown(
-        """
-        <div style='text-align: center'>
-            <p>Remember to take regular breaks and stay active! 💪</p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )

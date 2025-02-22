@@ -1,6 +1,6 @@
 import streamlit as st
 from typing import List, Dict
-import openai
+from openai import OpenAI
 from .database import save_chat_message, get_chat_history, get_user_data
 
 def init_spotify_player():
@@ -46,46 +46,49 @@ def init_spotify_player():
 def get_ai_response(user_id: int, user_message: str) -> str:
     """Get AI response based on user data and chat history"""
     try:
+        client = OpenAI()
+        
         # Get user data and recent chat history
         user_data = get_user_data(user_id)
         chat_history = get_chat_history(user_id)
+        username = user_data.get('name', 'there')
         
         # Create system message with user context
-        system_message = f"""You are a wellness assistant helping {user_data.get('name', 'there')}. 
-        Their current stress score is {user_data.get('assessments', [{}])[0].get('stress_score', 'unknown') if user_data.get('assessments') else 'unknown'} 
-        and their activity streak is {len(user_data.get('activities', []))} days.
-        
-        Provide personalized wellness advice based on their metrics and maintain a supportive, encouraging tone."""
+        system_message = {
+            "role": "system",
+            "content": f"""You are a wellness assistant for {username}. 
+CRITICAL INSTRUCTIONS:
+1. The user's name is '{username}' - ALWAYS use this name
+2. If asked about their name, respond with: "Yes, I know you're {username}!"
+3. Use their name naturally in responses
+4. Keep track of their metrics:
+   - Stress Score: {user_data.get('assessments', [{}])[0].get('stress_score', 'Not measured yet')}
+   - Activity Streak: {len(user_data.get('activities', []))} days
+   - BMI: {user_data.get('assessments', [{}])[0].get('bmi', 'Not measured yet')}
+5. Reference these metrics when relevant
+6. Maintain a supportive and personalized tone"""
+        }
         
         # Prepare messages for API
-        messages = [
-            {"role": "system", "content": system_message}
-        ]
+        messages = [system_message]
         
-        # Add recent chat history (limit to last 5 messages for context)
-        for role, content, _ in list(chat_history)[:5]:
+        # Add recent chat history (last 5 messages)
+        for db_role, content, _ in list(chat_history)[-5:]:
+            role = "assistant" if db_role == "assistant" else "user"
             messages.append({"role": role, "content": content})
         
         # Add current user message
         messages.append({"role": "user", "content": user_message})
         
         # Get AI response
-        response = openai.ChatCompletion.create(
-            model="gpt-4o-mini",  
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
             messages=messages,
             temperature=0.7,
             max_tokens=150
         )
         
-        ai_response = response.choices[0].message.content
-        
-        # Save both messages to database
-        save_chat_message(user_id, "user", user_message)
-        save_chat_message(user_id, "assistant", ai_response)
-        
-        return ai_response
+        return response.choices[0].message.content
         
     except Exception as e:
-        error_message = f"I apologize, but I encountered an error: {str(e)}"
-        save_chat_message(user_id, "assistant", error_message)
-        return error_message
+        return f"I apologize {username}, but I encountered an error: {str(e)}"

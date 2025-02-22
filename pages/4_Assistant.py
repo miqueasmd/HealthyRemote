@@ -1,92 +1,90 @@
 import streamlit as st
-import openai
-import os
-from utils.components import init_spotify_player
-from .database import get_user_by_email, get_user_data, save_chat_message, get_chat_history
+from utils.database import get_user_data, save_chat_message, get_chat_history
+from utils.components import get_ai_response
 
-init_spotify_player()
+# Page configuration
+st.set_page_config(page_title="AI Wellness Assistant", page_icon="💬", layout="wide")
 
-st.title("🧘‍♂️ Virtual Health Assistant")
+# Check authentication
+if not st.session_state.get("authenticated", False):
+    st.warning("Please login to access the AI Assistant.")
+    st.stop()
 
-st.markdown("""
-Welcome to the Virtual Health Assistant! This assistant is designed to help you with personalized recommendations 
-for preventing, diagnosing, and improving issues related to:
+# Initialize chat interface
+st.title("💬 Your Personal Wellness Assistant")
 
-1. Muscular and joint pain.
-2. Overweight.
-3. Stress.
+# Clear old messages if user wants to start fresh
+if st.sidebar.button("Clear Chat History"):
+    st.session_state.messages = []
+    st.rerun()
 
-Please describe your issue or select a category to get started.
-""")
-
-# Add more content and functionality for the assistant here
-
-# Load OpenAI API key from environment variable
-openai.api_key = os.getenv("OPENAI_API_KEY")
-
-def get_ai_response(user_id: int, user_message: str) -> str:
-    """Get AI response with personalized user context"""
+# Initialize or load chat history
+if "messages" not in st.session_state:
     try:
-        # Get user data including name and latest metrics
-        user_data = get_user_data(user_id)
+        # Get user data for personalized greeting
+        user_data = get_user_data(st.session_state.user_id)
+        username = user_data.get('name', 'there')
+        st.session_state.username = username  # Store username in session state
         
-        # Get user's latest assessment
-        latest_assessment = user_data['assessments'][0] if user_data['assessments'] else None
-        
-        # Create personalized system message
-        system_message = {
-            "role": "system",
-            "content": f"""You are a wellness assistant helping {user_data.get('name', 'there')}. 
-            Current metrics:
-            - Stress Score: {latest_assessment.get('stress_score', 'unknown') if latest_assessment else 'unknown'}
-            - Activity Streak: {len(user_data['activities'])} days
-            - Latest BMI: {latest_assessment.get('bmi', 'unknown') if latest_assessment else 'unknown'}
-            
-            Provide personalized wellness advice using their name and metrics."""
-        }
-        
-        # Get recent chat history
-        chat_history = get_chat_history(user_id, limit=5)
-        messages = [system_message]
-        
-        # Add chat history to context
-        for role, content, _ in chat_history:
-            messages.append({"role": role, "content": content})
-            
-        # Add current user message
-        messages.append({"role": "user", "content": user_message})
-        
-        # Get OpenAI response
-        response = openai.ChatCompletion.create(
-            model="gpt-4o-mini",
-            messages=messages,
-            temperature=0.7,
-            max_tokens=150
-        )
-        
-        ai_response = response.choices[0].message.content
-        
-        # Save the conversation
-        save_chat_message(user_id, "user", user_message)
-        save_chat_message(user_id, "assistant", ai_response)
-        
-        return ai_response
+        # Create initial greeting with user's name and data
+        initial_greeting = f"""Hello {username}! 👋 
+
+How are you feeling today?
+
+Your current wellness metrics:
+• 😌 Stress Level: {user_data.get('assessments', [{}])[0].get('stress_score', 'Not measured yet') if user_data.get('assessments') else 'Not measured yet'}/10
+• 🏃‍♂️ Activity Streak: {len(user_data.get('activities', []))} days
+• 📊 BMI: {user_data.get('assessments', [{}])[0].get('bmi', 'Not measured yet') if user_data.get('assessments') else 'Not measured yet'}
+
+Let me know if you need any support or guidance!"""
+
+        # Initialize chat with stronger system context
+        system_prompt = f"""You are a wellness assistant for {username}. 
+CRITICAL INSTRUCTIONS:
+1. The user's name is '{username}' - ALWAYS use this name
+2. If asked about their name, respond with: "Yes, I know you're {username}!"
+3. Use their name naturally in responses
+4. Keep track of their metrics and reference them when relevant
+5. Maintain a supportive and personalized tone"""
+
+        st.session_state.messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "assistant", "content": initial_greeting}
+        ]
+        save_chat_message(st.session_state.user_id, "system", system_prompt)
+        save_chat_message(st.session_state.user_id, "assistant", initial_greeting)
         
     except Exception as e:
-        return f"I apologize, but I encountered an error: {str(e)}"
+        st.error(f"Error initializing chat: {str(e)}")
+        initial_greeting = "Hello! I'm your personal wellness assistant. How can I help you today?"
+        st.session_state.messages = [{"role": "assistant", "content": initial_greeting}]
 
-# User input
-user_input = st.text_area("Describe your issue or ask a question:")
+# Display chat messages
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-if st.button("Get Recommendation"):
-    if user_input:
-        try:
-            user_id = get_user_by_email(st.session_state['email'])['id']
-            recommendation = get_ai_response(user_id, user_input)
-            st.markdown(f"**Recommendation:** {recommendation}")
+# Chat input
+if prompt := st.chat_input("Type your message here..."):
+    # Display user message
+    with st.chat_message("user"):
+        st.markdown(prompt)
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    save_chat_message(st.session_state.user_id, "user", prompt)
 
-        except Exception as e:
-            st.error(f"Error generating recommendation: {e}")
+    # Get and display assistant response
+    with st.chat_message("assistant"):
+        response = get_ai_response(st.session_state.user_id, prompt)
+        st.markdown(response)
+    st.session_state.messages.append({"role": "assistant", "content": response})
 
-    else:
-        st.warning("Please enter a description or question.")
+# Helpful sidebar tips
+with st.sidebar:
+    st.markdown("""
+    ### 💡 How I can help you:
+    - Track your wellness metrics
+    - Suggest personalized exercises
+    - Provide stress management techniques
+    - Guide you through meditation
+    - Share work-life balance tips
+    """)
