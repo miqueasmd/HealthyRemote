@@ -59,7 +59,7 @@ if not st.session_state.authenticated:
                         user_id = create_new_user(name, email)
                         st.session_state.user_id = user_id
                         st.session_state.authenticated = True
-                        st.success("Account created successfully!")
+                        st.success(f"Account created successfully, {name}!")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error creating account: {e}")
@@ -71,8 +71,8 @@ else:
     st.title("🧘‍♂️ Healthy Remote Wellness Platform")
 
     # Welcome message
-    st.markdown("""
-    Welcome to your personal wellness companion! This platform is designed to help remote workers 
+    st.markdown(f"""
+    Welcome to your personal wellness companion, {st.session_state.email.split('@')[0]}! This platform is designed to help remote workers 
     like you maintain and improve their physical and mental well-being.
 
     ### What we offer:

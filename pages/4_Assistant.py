@@ -23,7 +23,7 @@ if "messages" not in st.session_state:
     try:
         # Get user data for personalized greeting
         user_data = get_user_data(st.session_state.user_id)
-        username = user_data.get('name', 'there')
+        username = user_data.get('name')
         st.session_state.username = username  # Store username in session state
         
         # Create initial greeting with user's name and data

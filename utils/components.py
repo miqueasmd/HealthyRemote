@@ -51,7 +51,7 @@ def get_ai_response(user_id: int, user_message: str) -> str:
         # Get user data and recent chat history
         user_data = get_user_data(user_id)
         chat_history = get_chat_history(user_id)
-        username = user_data.get('name', 'there')
+        username = user_data.get('name')
         
         # Create system message with user context
         system_message = {
