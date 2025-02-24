@@ -26,6 +26,8 @@ if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
 if 'email' not in st.session_state:
     st.session_state.email = None
+if 'username' not in st.session_state:  # Add username initialization
+    st.session_state.username = None
 
 # Login/Signup System
 if not st.session_state.authenticated:
@@ -39,10 +41,19 @@ if not st.session_state.authenticated:
         if st.button("Login"):
             user_id = get_user_by_email(login_email)
             if user_id:
-                st.session_state.user_id = user_id
-                st.session_state.email = login_email
-                st.session_state.authenticated = True
-                st.rerun()
+                try:
+                    user_data = get_user_data(user_id)
+                    if not user_data or 'name' not in user_data:
+                        st.error("Could not retrieve user data")
+                        st.stop()
+                    
+                    st.session_state.user_id = user_id
+                    st.session_state.email = login_email
+                    st.session_state.username = user_data['name']
+                    st.session_state.authenticated = True
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error during login: {str(e)}")
             else:
                 st.error("User not found. Please sign up if you're new!")
 
@@ -58,6 +69,8 @@ if not st.session_state.authenticated:
                     try:
                         user_id = create_new_user(name, email)
                         st.session_state.user_id = user_id
+                        st.session_state.email = email
+                        st.session_state.username = name  # Store name in session
                         st.session_state.authenticated = True
                         st.success(f"Account created successfully, {name}!")
                         st.rerun()
@@ -72,7 +85,7 @@ else:
 
     # Welcome message
     st.markdown(f"""
-    Welcome to your personal wellness companion, {st.session_state.email.split('@')[0]}! This platform is designed to help remote workers 
+    Welcome to your personal wellness companion, {st.session_state.username}! This platform is designed to help remote workers 
     like you maintain and improve their physical and mental well-being.
 
     ### What we offer:
@@ -88,6 +101,8 @@ else:
     if st.sidebar.button("Logout"):
         st.session_state.authenticated = False
         st.session_state.user_id = None
+        st.session_state.email = None
+        st.session_state.username = None  # Clear username on logout
         st.rerun()
 
     # Quick status overview using database queries

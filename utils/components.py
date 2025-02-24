@@ -51,7 +51,12 @@ def get_ai_response(user_id: int, user_message: str) -> str:
         # Get user data and recent chat history
         user_data = get_user_data(user_id)
         chat_history = get_chat_history(user_id)
-        username = user_data.get('name')
+        
+        # Get username from user_data, fail if not found
+        if not user_data or 'name' not in user_data:
+            raise ValueError("Could not retrieve user name from database")
+            
+        username = user_data['name']  # No default value - we want the actual name
         
         # Create system message with user context
         system_message = {

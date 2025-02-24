@@ -2,6 +2,34 @@ import streamlit as st
 from utils.database import get_user_data, save_chat_message, get_chat_history
 from utils.components import get_ai_response
 
+def format_user_metrics(user_data):
+    """Format user metrics and history"""
+    # Get latest metrics
+    latest_assessment = user_data.get('assessments', [{}])[0]
+    metrics = {
+        'stress': latest_assessment.get('stress_score', 'Not measured'),
+        'bmi': latest_assessment.get('bmi', 'Not measured'),
+        'activity_streak': len(user_data.get('activities', []))
+    }
+    
+    # Format weight history
+    weight_logs = []
+    for log in user_data.get('weight_logs', []):
+        weight_logs.append(f"|{log['date'].strftime('%Y-%m-%d')}|{log['weight']} kg|")
+    
+    # Format challenges
+    challenges = []
+    for challenge in user_data.get('active_challenges', []):
+        progress = challenge.get('progress', {})
+        day = progress.get('current_day', 1)
+        tasks = progress.get('completed_tasks', [])
+        challenges.append(
+            f"- 🌟 **{challenge['challenge_name']}** (Day {day})\n"
+            f"  - Progress: {', '.join(tasks) if tasks else 'Just started'}"
+        )
+    
+    return metrics, weight_logs, challenges
+
 # Page configuration
 st.set_page_config(page_title="AI Wellness Assistant", page_icon="💬", layout="wide")
 
@@ -13,73 +41,14 @@ if not st.session_state.get("authenticated", False):
 # Initialize chat interface
 st.title("💬 Your Personal Wellness Assistant")
 
-# Clear old messages if user wants to start fresh
-if st.sidebar.button("Clear Chat History"):
-    st.session_state.messages = []
-    st.rerun()
-
-# Initialize or load chat history
-if "messages" not in st.session_state:
-    try:
-        # Get user data for personalized greeting
-        user_data = get_user_data(st.session_state.user_id)
-        username = user_data.get('name')
-        st.session_state.username = username  # Store username in session state
-        
-        # Create initial greeting with user's name and data
-        initial_greeting = f"""Hello {username}! 👋 
-
-How are you feeling today?
-
-Your current wellness metrics:
-• 😌 Stress Level: {user_data.get('assessments', [{}])[0].get('stress_score', 'Not measured yet') if user_data.get('assessments') else 'Not measured yet'}/10
-• 🏃‍♂️ Activity Streak: {len(user_data.get('activities', []))} days
-• 📊 BMI: {user_data.get('assessments', [{}])[0].get('bmi', 'Not measured yet') if user_data.get('assessments') else 'Not measured yet'}
-
-Let me know if you need any support or guidance!"""
-
-        # Initialize chat with stronger system context
-        system_prompt = f"""You are a wellness assistant for {username}. 
-CRITICAL INSTRUCTIONS:
-1. The user's name is '{username}' - ALWAYS use this name
-2. If asked about their name, respond with: "Yes, I know you're {username}!"
-3. Use their name naturally in responses
-4. Keep track of their metrics and reference them when relevant
-5. Maintain a supportive and personalized tone"""
-
-        st.session_state.messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "assistant", "content": initial_greeting}
-        ]
-        save_chat_message(st.session_state.user_id, "system", system_prompt)
-        save_chat_message(st.session_state.user_id, "assistant", initial_greeting)
-        
-    except Exception as e:
-        st.error(f"Error initializing chat: {str(e)}")
-        initial_greeting = "Hello! I'm your personal wellness assistant. How can I help you today?"
-        st.session_state.messages = [{"role": "assistant", "content": initial_greeting}]
-
-# Display chat messages
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-# Chat input
-if prompt := st.chat_input("Type your message here..."):
-    # Display user message
-    with st.chat_message("user"):
-        st.markdown(prompt)
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    save_chat_message(st.session_state.user_id, "user", prompt)
-
-    # Get and display assistant response
-    with st.chat_message("assistant"):
-        response = get_ai_response(st.session_state.user_id, prompt)
-        st.markdown(response)
-    st.session_state.messages.append({"role": "assistant", "content": response})
-
-# Helpful sidebar tips
+# Sidebar content
 with st.sidebar:
+    # Clear chat button
+    if st.button("Clear Chat History"):
+        st.session_state.messages = []
+        st.rerun()
+    
+    # Help section
     st.markdown("""
     ### 💡 How I can help you:
     - Track your wellness metrics
@@ -88,3 +57,76 @@ with st.sidebar:
     - Guide you through meditation
     - Share work-life balance tips
     """)
+
+# Initialize or load chat history
+if "messages" not in st.session_state:
+    try:
+        # Get and format user data
+        user_data = get_user_data(st.session_state.user_id)
+        username = user_data['name']
+        metrics, weight_logs, challenges = format_user_metrics(user_data)
+        
+        # Create initial greeting with formatted data
+        initial_greeting = f"""Hello {username}! 👋  
+
+How are you feeling today?  
+
+### Your current wellness metrics:
+- 😌 **Stress Level:** {metrics['stress']}/10  
+- 🏃‍♂️ **Activity Streak:** {metrics['activity_streak']} days  
+- 📊 **BMI:** {metrics['bmi']}  
+
+### 🎯 Active Challenges:
+{chr(10).join(challenges) if challenges else "No active challenges at the moment."}
+"""
+
+        # Update system prompt to properly use challenges data
+        system_prompt = f"""You are a wellness assistant for {username}. 
+
+USER DATA:
+1. Current Metrics:
+   - Stress: {metrics['stress']}/10
+   - BMI: {metrics['bmi']}
+   - Activity Streak: {metrics['activity_streak']} days
+
+2. Active Challenges:
+{chr(10).join(challenges) if challenges else "No active challenges"}
+
+RESPONSE GUIDELINES:
+1. When asked about challenges, ALWAYS check and list ALL active challenges
+2. Format challenges as:
+   ### 🎯 Active Challenges
+   {chr(10).join(challenges) if challenges else "You don't have any active challenges at the moment."}
+3. Keep responses supportive and encouraging
+4. Reference specific challenge names when discussing progress"""
+
+        # Store messages but only display the greeting
+        st.session_state.messages = [
+            {"role": "system", "content": system_prompt, "visible": False},
+            {"role": "assistant", "content": initial_greeting, "visible": True}
+        ]
+        save_chat_message(st.session_state.user_id, "system", system_prompt)
+        save_chat_message(st.session_state.user_id, "assistant", initial_greeting)
+        
+    except Exception as e:
+        st.error(f"Error initializing chat: {str(e)}")
+        initial_greeting = "Hello! I'm your personal wellness assistant. How can I help you today?"
+        st.session_state.messages = [{"role": "assistant", "content": initial_greeting, "visible": True}]
+
+# Display chat messages (only visible ones)
+for message in st.session_state.messages:
+    if message.get("visible", True):
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+# Chat input
+if prompt := st.chat_input("Type your message here..."):
+    with st.chat_message("user"):
+        st.markdown(prompt)
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    save_chat_message(st.session_state.user_id, "user", prompt)
+
+    with st.chat_message("assistant"):
+        response = get_ai_response(st.session_state.user_id, prompt)
+        st.markdown(response)
+    st.session_state.messages.append({"role": "assistant", "content": response})

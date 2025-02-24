@@ -402,16 +402,67 @@ def get_active_challenges(user_id):
     conn.close()
     return challenges
 
-def get_user_data(user_id):
-    """Get all user data for dashboard display."""
-    return {
-        'assessments': get_assessments(user_id),
-        'activities': get_activities(user_id),
-        'stress_logs': get_stress_logs(user_id),
-        'weight_logs': get_weight_logs(user_id),
-        'mobility_tests': get_mobility_tests(user_id),
-        'active_challenges': get_active_challenges(user_id)
-    }
+def get_user_data(user_id: int) -> dict:
+    """Get all user data including challenges"""
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    try:
+        # Get active challenges with proper join
+        cur.execute("""
+            SELECT c.id, c.challenge_name, c.status, c.progress,
+                   c.start_date, c.end_date
+            FROM challenges c
+            WHERE c.user_id = %s AND c.status = 'active'
+            ORDER BY c.start_date DESC
+        """, (user_id,))
+        active_challenges = cur.fetchall()
+        
+        # Rest of the data retrieval...
+        cur.execute("""
+            SELECT name, email, created_at 
+            FROM users 
+            WHERE id = %s
+        """, (user_id,))
+        basic_info = cur.fetchone()
+        
+        if not basic_info:
+            return None
+            
+        cur.execute("SELECT * FROM assessments WHERE user_id = %s ORDER BY date DESC", (user_id,))
+        assessments = cur.fetchall()
+        
+        cur.execute("SELECT * FROM activities WHERE user_id = %s ORDER BY date DESC", (user_id,))
+        activities = cur.fetchall()
+        
+        cur.execute("SELECT * FROM stress_logs WHERE user_id = %s ORDER BY date DESC", (user_id,))
+        stress_logs = cur.fetchall()
+        
+        cur.execute("SELECT * FROM weight_logs WHERE user_id = %s ORDER BY date DESC", (user_id,))
+        weight_logs = cur.fetchall()
+        
+        cur.execute("SELECT * FROM mobility_tests WHERE user_id = %s ORDER BY date DESC", (user_id,))
+        mobility_tests = cur.fetchall()
+        
+        cur.execute("SELECT * FROM challenges WHERE user_id = %s AND status = 'active' ORDER BY start_date DESC", (user_id,))
+        active_challenges = cur.fetchall()
+        
+        # Combine all data
+        return {
+            'name': basic_info['name'],
+            'email': basic_info['email'],
+            'created_at': basic_info['created_at'],
+            'assessments': assessments,
+            'activities': activities,
+            'stress_logs': stress_logs,
+            'weight_logs': weight_logs,
+            'mobility_tests': mobility_tests,
+            'active_challenges': active_challenges  # This should now contain proper challenge data
+        }
+        
+    finally:
+        cur.close()
+        conn.close()
 
 def save_chat_message(user_id: int, role: str, content: str):
     """Save a chat message to the database"""
@@ -453,3 +504,40 @@ def init_chat_table():
             )
         """)
     conn.commit()
+
+def debug_list_users():
+    """Debug function to list all users in the database"""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT id, name, email FROM users")
+        users = cur.fetchall()
+        return users
+    except Exception as e:
+        print(f"Error querying users: {e}")
+        return []
+    finally:
+        cur.close()
+        conn.close()
+
+def debug_check_user(email: str):
+    """Debug function to check user data in database"""
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)  # Use RealDictCursor
+    try:
+        # Check users table
+        cur.execute("SELECT * FROM users WHERE email = %s", (email,))
+        user_data = cur.fetchone()
+        
+        if user_data:
+            return {
+                "found": True,
+                "user_data": dict(user_data)  # Convert RealDictRow to dict
+            }
+        return {
+            "found": False,
+            "user_data": None
+        }
+    finally:
+        cur.close()
+        conn.close()
