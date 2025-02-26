@@ -44,84 +44,42 @@ def init_spotify_player():
     """, unsafe_allow_html=True)
 
 def get_ai_response(user_id: int, user_message: str) -> str:
-    """Get AI response based on user data and chat history."""
     try:
         client = OpenAI()
-
-        # Get user data and chat history
+        
+        # Get comprehensive user data
         user_data = get_user_data(user_id)
-        chat_history = get_chat_history(user_id, limit=10)  # Retrieve last 10 messages
-
-        # Ensure we have user details
-        if not user_data or 'name' not in user_data:
-            raise ValueError("Could not retrieve user name from database")
-        username = user_data['name']
-
-        # Fetch user's historical data
-        stress_logs = user_data.get("stress_logs", [])
-        weight_logs = user_data.get("weight_logs", [])
-        active_challenges = user_data.get("active_challenges", [])
-
-        # Prepare structured historical data
-        stress_history = "\n".join([f"- {log['date'].strftime('%Y-%m-%d')}: {log['stress_score']}/10" for log in stress_logs]) or "No stress logs recorded."
-        weight_history = "\n".join([f"- {log['date'].strftime('%Y-%m-%d')}: {log['weight']} kg" for log in weight_logs]) or "No weight records found."
-        challenges_summary = "\n".join(
-            [f"- 🌟 **{ch['challenge_name']}** (Day {ch['progress']['current_day']})" for ch in active_challenges]
-        ) or "No active challenges at the moment."
-
-        # System message providing context
+        
+        # Create system message with all available data
         system_message = {
             "role": "system",
-            "content": f"""
-You are a wellness assistant for {username}. You remember past conversations and provide helpful responses. 
+            "content": f"""You are HealthyRemote, a wellness assistant for {user_data['name']}. 
+You have access to their complete health records:
 
-### **Current User Metrics**
-- 😌 **Stress Level:** {stress_logs[0]['stress_score'] if stress_logs else 'Not recorded'}
-- 🏃‍♂️ **Activity Streak:** {len(user_data.get('activities', []))} days
-- 📊 **BMI:** {user_data.get('assessments', [{}])[0].get('bmi', 'Not measured yet')}
+1. Weight History: {[f"{w['date'].strftime('%Y-%m-%d')}: {w['weight']}kg" for w in user_data['weight_logs']]}
+2. Latest Assessment:
+   - Stress Score: {user_data['assessments'][0]['stress_score'] if user_data['assessments'] else 'No data'}
+   - BMI: {user_data['assessments'][0]['bmi'] if user_data['assessments'] else 'No data'}
+3. Activity History: {len(user_data['activities'])} activities recorded
+4. Stress History: {[f"{s['date'].strftime('%Y-%m-%d')}: {s['stress_score']}/10" for s in user_data['stress_logs']]}
+5. Active Challenges: {[c['challenge_name'] for c in user_data['active_challenges']]}
 
-### **Historical Data**
-#### 🧘 **Stress Logs**
-{stress_history}
-
-#### ⚖️ **Weight History**
-{weight_history}
-
-#### 🎯 **Active Challenges**
-{challenges_summary}
-
-### **Chat Memory**
-You remember the last 10 messages. Respond naturally and supportively.
-"""
+You can access and reference this data when responding to queries.
+Always provide accurate information based on these records.
+When asked about your name, always respond that you are HealthyRemote."""
         }
-
-        # Prepare chat messages (include user history)
+        
         messages = [system_message]
-
-        # Add recent chat history for context
-        for db_role, content, _ in chat_history:
-            role = "assistant" if db_role == "assistant" else "user"
-            messages.append({"role": role, "content": content})
-
-        # Add current user message
         messages.append({"role": "user", "content": user_message})
-
-        # Get AI response
+        
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4",
             messages=messages,
             temperature=0.7,
-            max_tokens=200
+            max_tokens=150
         )
-
-        # Extract assistant response
-        ai_response = response.choices[0].message.content
-
-        # Save conversation to database
-        save_chat_message(user_id, "user", user_message)
-        save_chat_message(user_id, "assistant", ai_response)
-
-        return ai_response
-
+        
+        return response.choices[0].message.content
+        
     except Exception as e:
-        return f"I apologize {username}, but I encountered an error: {str(e)}"
+        return f"I apologize, but I encountered an error: {str(e)}"

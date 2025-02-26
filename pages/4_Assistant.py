@@ -4,20 +4,19 @@ from utils.components import get_ai_response
 
 def format_user_metrics(user_data):
     """Format user metrics and history"""
-    # Get latest metrics
-    latest_assessment = user_data.get('assessments', [{}])[0]
-    metrics = {
-        'stress': latest_assessment.get('stress_score', 'Not measured'),
-        'bmi': latest_assessment.get('bmi', 'Not measured'),
-        'activity_streak': len(user_data.get('activities', []))
-    }
-    
-    # Format challenges list with proper indentation
+    # Format metrics with bullet points
+    metrics = f"""
+- 😌 Stress Level: {user_data['assessments'][-1].get('stress_score', 'N/A')}/10
+- 🏃‍♂️ Activity Streak: {len(user_data.get('activities', []))} days
+- 📊 BMI: {user_data['assessments'][-1].get('bmi', 'N/A')}"""
+
+    # Format challenges list with compact spacing
     challenges_text = []
     if user_data.get('active_challenges'):
         for ch in user_data['active_challenges']:
             challenge_title = f"- 🌟 **{ch['challenge_name']} (Day {ch['progress']['current_day']})**"
             progress_tasks = "\n  - ".join([f"✅ {task}" for task in ch['progress'].get('completed_tasks', [])])
+            # Remove extra newline by directly connecting title with tasks
             challenges_text.append(f"{challenge_title}\n  - {progress_tasks}")
     
     
@@ -29,7 +28,7 @@ def format_user_metrics(user_data):
         'assessments': user_data.get('assessments', []),
     }
     
-    return metrics, historical_data, "\n\n".join(challenges_text)  # Add extra newline for separation
+    return metrics, historical_data, "\n".join(challenges_text)  # Remove extra newlines between challenges
 
 # Page configuration
 st.set_page_config(page_title="AI Wellness Assistant", page_icon="💬", layout="wide")
@@ -40,7 +39,7 @@ if not st.session_state.get("authenticated", False):
     st.stop()
 
 # Initialize chat interface
-st.title("💬 Your Personal Wellness Assistant")
+st.title("💬 HealthyRemote, Your Personal Wellness Assistant")
 
 # Create two columns for layout
 col1, col2 = st.columns([2, 1])
@@ -107,74 +106,57 @@ with col2:
 
 # Left column: Chat Interface
 with col1:
-    if "messages" not in st.session_state:
-        try:
-            # Get user data
-            user_data = get_user_data(st.session_state.user_id)
-            username = user_data['name']
-            metrics, historical_data, challenges_formatted = format_user_metrics(user_data)
+    # Create a main container for messages
+    message_container = st.container()
+    
+    # Display messages in the message container
+    with message_container:
+        if "messages" not in st.session_state:
+            try:
+                # Get user data
+                user_data = get_user_data(st.session_state.user_id)
+                username = user_data['name']
+                metrics, historical_data, challenges_formatted = format_user_metrics(user_data)
 
-            # Create initial greeting with properly formatted challenges
-            initial_greeting = f"""Hello {username}! 👋
+                # Create initial greeting
+                initial_greeting = f"""Hello {username}! 👋
 
 How are you feeling today?
 
 Your current wellness metrics:
-😌 Stress Level: {metrics['stress']}/10
-🏃‍♂️ Activity Streak: {metrics['activity_streak']} days
-📊 BMI: {metrics['bmi']}
+{metrics}
 
 🎯 Active Challenges:
 {challenges_formatted if challenges_formatted else "No active challenges at the moment."}
 """
-            # Store messages
-            st.session_state.messages = [
-                {"role": "assistant", "content": initial_greeting, "visible": True}
-            ]
-            
-        except Exception as e:
-            st.error(f"Error initializing chat: {str(e)}")
-            st.session_state.messages = [{"role": "assistant", 
-                "content": "Hello! I'm your personal wellness assistant. How can I help you today?", 
-                "visible": True}]
+                # Initialize messages
+                st.session_state.messages = [
+                    {"role": "assistant", "content": initial_greeting, "visible": True}
+                ]
+            except Exception as e:
+                st.error(f"Error initializing chat: {str(e)}")
+                st.session_state.messages = [{"role": "assistant", 
+                    "content": "Hello! I'm your personal wellness assistant. How can I help you today?", 
+                    "visible": True}]
 
-    # Display chat messages
-    for message in st.session_state.messages:
-        if message.get("visible", True):
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
+        # Display existing messages
+        for message in st.session_state.messages:
+            if message.get("visible", True):
+                with st.chat_message(message["role"]):
+                    st.markdown(message["content"])
+    
+    # Chat input at the bottom
+    user_input = st.chat_input("Type your message here...")
 
-    # Chat input
-    if prompt := st.chat_input("Type your message here..."):
-        with st.chat_message("user"):
-            st.markdown(prompt)
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        save_chat_message(st.session_state.user_id, "user", prompt)
+    # Process the message when submitted
+    if user_input:
+        # Add user message to state and display
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        save_chat_message(st.session_state.user_id, "user", user_input)
 
-        with st.chat_message("assistant"):
-            # Check if it's a records request
-            if any(keyword in prompt.lower() for keyword in ["show records", "show history", "weight history", "stress history"]):
-                # Get fresh data
-                user_data = get_user_data(st.session_state.user_id)
-                metrics, historical_data, challenges = format_user_metrics(user_data)
-                
-                if "weight" in prompt.lower():
-                    response = """Here are your weight records:
-                    ```markdown
-                    | Date | Weight (kg) |
-                    |------|------------|
-                    {}
-                    ```
-                    """.format('\n'.join([
-                        f"|{w['date'].strftime('%Y-%m-%d')}|{w['weight']}|" 
-                        for w in historical_data['weight_logs']
-                    ]))
-                else:
-                    # Let AI handle other responses
-                    response = get_ai_response(st.session_state.user_id, prompt)
-            else:
-                response = get_ai_response(st.session_state.user_id, prompt)
-                
-            st.markdown(response)
+        # Get and add AI response
+        response = get_ai_response(st.session_state.user_id, user_input)
         st.session_state.messages.append({"role": "assistant", "content": response})
+        
+        st.rerun()
 
