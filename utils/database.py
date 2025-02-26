@@ -408,17 +408,7 @@ def get_user_data(user_id: int) -> dict:
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        # Get active challenges with proper join
-        cur.execute("""
-            SELECT c.id, c.challenge_name, c.status, c.progress,
-                   c.start_date, c.end_date
-            FROM challenges c
-            WHERE c.user_id = %s AND c.status = 'active'
-            ORDER BY c.start_date DESC
-        """, (user_id,))
-        active_challenges = cur.fetchall()
-        
-        # Rest of the data retrieval...
+        # Get basic user info
         cur.execute("""
             SELECT name, email, created_at 
             FROM users 
@@ -429,25 +419,61 @@ def get_user_data(user_id: int) -> dict:
         if not basic_info:
             return None
             
-        cur.execute("SELECT * FROM assessments WHERE user_id = %s ORDER BY date DESC", (user_id,))
+        # Get assessments with proper ordering
+        cur.execute("""
+            SELECT date, stress_score, bmi, activity_level, physical_score, pain_points 
+            FROM assessments 
+            WHERE user_id = %s 
+            ORDER BY date DESC
+        """, (user_id,))
         assessments = cur.fetchall()
         
-        cur.execute("SELECT * FROM activities WHERE user_id = %s ORDER BY date DESC", (user_id,))
+        # Get activities with type info
+        cur.execute("""
+            SELECT date, activity_type, duration 
+            FROM activities 
+            WHERE user_id = %s 
+            ORDER BY date DESC
+        """, (user_id,))
         activities = cur.fetchall()
         
-        cur.execute("SELECT * FROM stress_logs WHERE user_id = %s ORDER BY date DESC", (user_id,))
+        # Get stress logs with proper formatting
+        cur.execute("""
+            SELECT date, stress_score 
+            FROM stress_logs 
+            WHERE user_id = %s 
+            ORDER BY date DESC
+        """, (user_id,))
         stress_logs = cur.fetchall()
         
-        cur.execute("SELECT * FROM weight_logs WHERE user_id = %s ORDER BY date DESC", (user_id,))
+        # Get weight logs with proper formatting
+        cur.execute("""
+            SELECT date, weight 
+            FROM weight_logs 
+            WHERE user_id = %s 
+            ORDER BY date DESC
+        """, (user_id,))
         weight_logs = cur.fetchall()
         
-        cur.execute("SELECT * FROM mobility_tests WHERE user_id = %s ORDER BY date DESC", (user_id,))
-        mobility_tests = cur.fetchall()
-        
-        cur.execute("SELECT * FROM challenges WHERE user_id = %s AND status = 'active' ORDER BY start_date DESC", (user_id,))
+        # Get active challenges with progress
+        cur.execute("""
+            SELECT challenge_name, start_date, end_date, status, progress 
+            FROM challenges 
+            WHERE user_id = %s AND status = 'active' 
+            ORDER BY start_date DESC
+        """, (user_id,))
         active_challenges = cur.fetchall()
         
-        # Combine all data
+        # Get chat history
+        cur.execute("""
+            SELECT role, content, timestamp 
+            FROM chat_history 
+            WHERE user_id = %s 
+            ORDER BY timestamp DESC 
+            LIMIT 15
+        """, (user_id,))
+        chat_history = cur.fetchall()
+        
         return {
             'name': basic_info['name'],
             'email': basic_info['email'],
@@ -456,8 +482,8 @@ def get_user_data(user_id: int) -> dict:
             'activities': activities,
             'stress_logs': stress_logs,
             'weight_logs': weight_logs,
-            'mobility_tests': mobility_tests,
-            'active_challenges': active_challenges  # This should now contain proper challenge data
+            'active_challenges': active_challenges,
+            'chat_history': chat_history
         }
         
     finally:
@@ -477,7 +503,7 @@ def save_chat_message(user_id: int, role: str, content: str):
     conn.commit()
     return message_id
 
-def get_chat_history(user_id: int, limit: int = 10):
+def get_chat_history(user_id: int, limit: int = 15):
     """Get recent chat history for a user"""
     conn = get_db_connection()
     with conn.cursor() as cur:
