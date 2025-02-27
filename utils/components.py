@@ -256,6 +256,10 @@ Important formatting instructions:
         contains_user_data = any(term in formatted_response.lower() for term in
             ["bmi", "stress score", "stress level", "weight", "kg", "assessment", "challenge"])
         
+        # Check if this is an emotional/support response
+        is_emotional_response = any(term in user_message.lower() for term in
+            ["sad", "angry", "upset", "depressed", "anxious", "feeling down", "not well", "tired", "exhausted", "help me"])
+        
         # Add continuation prompt for long responses that aren't answers to "is it finished" questions
         response_word_count = len(formatted_response.split())
         should_add_prompt = (
@@ -268,8 +272,13 @@ Important formatting instructions:
             # Response is long enough
             response_word_count > 100 and
             
-            # Either it's a story OR it's a data response
-            (is_story_response or is_health_narrative or (is_data_response or contains_user_data))
+            # Either it's a story OR it's a data response WITH LOTS OF DATA
+            # But NOT an emotional support response
+            (is_story_response or is_health_narrative or 
+             (is_data_response and contains_user_data and response_word_count > 150)) and
+            
+            # Not an emotional support response
+            not is_emotional_response
         )
         
         # Don't add continuation prompt if we already added a conclusion
