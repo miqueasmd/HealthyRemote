@@ -3,12 +3,13 @@ from utils.database import get_user_data, save_chat_message, get_chat_history
 from utils.components import get_ai_response
 
 def format_user_metrics(user_data):
+
     """Format user metrics and history"""
     # Format metrics with bullet points
     metrics = f"""
-- 😌 Stress Level: {user_data['assessments'][-1].get('stress_score', 'N/A')}/10
+- 😌 Stress Level: {user_data['assessments'][0].get('stress_score', 'N/A')}/10
 - 🏃‍♂️ Activity Streak: {len(user_data.get('activities', []))} days
-- 📊 BMI: {user_data['assessments'][-1].get('bmi', 'N/A')}"""
+- 📊 BMI: {user_data['assessments'][0].get('bmi', 'N/A')}"""
 
     # Format challenges list with compact spacing
     challenges_text = []
@@ -150,12 +151,21 @@ Your current wellness metrics:
 
     # Process the message when submitted
     if user_input:
-        # Add user message to state and display
-        st.session_state.messages.append({"role": "user", "content": user_input})
-        save_chat_message(st.session_state.user_id, "user", user_input)
+        # Check if the user wants to continue
+        if user_input.lower() == "continue":
+            # Retrieve the last response
+            previous_response = st.session_state.get('last_response', "")
+            response = get_ai_response(st.session_state.user_id, user_input, previous_response)
+        else:
+            # Add user message to state and display
+            st.session_state.messages.append({"role": "user", "content": user_input})
+            save_chat_message(st.session_state.user_id, "user", user_input)
 
-        # Get and add AI response
-        response = get_ai_response(st.session_state.user_id, user_input)
+            # Get and add AI response
+            response = get_ai_response(st.session_state.user_id, user_input)
+        
+        # Store the last response
+        st.session_state.last_response = response
         st.session_state.messages.append({"role": "assistant", "content": response})
         
         st.rerun()

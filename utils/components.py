@@ -43,18 +43,31 @@ def init_spotify_player():
         </iframe>
     """, unsafe_allow_html=True)
 
-def get_ai_response(user_id: int, user_message: str) -> str:
+def get_ai_response(user_id: int, user_message: str, previous_response: str = "") -> str:
     try:
         client = OpenAI()
         
         # Get comprehensive user data
         user_data = get_user_data(user_id)
+
+        # Create conversation context from chat history
+        conversation_context = "\n".join([f"{msg['role']}: {msg['content']}" for msg in user_data['chat_history']])
+
+        # Include previous response if available
+        if previous_response:
+            conversation_context += f"\nAssistant: {previous_response}"
+
+        # Create a formatted string for all assessments
+        assessments_info = "\n".join([
+            f"- Date: {assessment['date']}, Stress Score: {assessment['stress_score']}, BMI: {assessment['bmi']}"
+            for assessment in user_data['assessments']
+        ])
         
         # Create system message with all available data
         system_message = {
             "role": "system",
             "content": f"""You are HealthyRemote, a wellness assistant for {user_data['name']}. 
-You have access to their complete health records:
+You have access to their complete health records, previous conversation context {conversation_context} and previous assessments {assessments_info}:
 
 1. Weight History: {[f"{w['date'].strftime('%Y-%m-%d')}: {w['weight']}kg" for w in user_data['weight_logs']]}
 2. Latest Assessment:
@@ -73,13 +86,28 @@ When asked about your name, always respond that you are HealthyRemote."""
         messages.append({"role": "user", "content": user_message})
         
         response = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o-mini",
             messages=messages,
             temperature=0.7,
-            max_tokens=150
+            max_tokens=300
         )
         
-        return response.choices[0].message.content
+        response_text = response.choices[0].message.content
+        
+        # Check response length
+        word_limit = 200
+        char_limit = 1200
+        
+        if len(response_text.split()) > word_limit or len(response_text) > char_limit:
+            # Truncate to the nearest word or character limit
+            if len(response_text.split()) > word_limit:
+                response_text = ' '.join(response_text.split()[:word_limit]) + "..."
+            if len(response_text) > char_limit:
+                response_text = response_text[:char_limit].rsplit(' ', 1)[0] + "..."
+            
+            response_text += "\n\nWould you like to see more?... \n(Write 'continue')"
+        
+        return response_text
         
     except Exception as e:
         return f"I apologize, but I encountered an error: {str(e)}"

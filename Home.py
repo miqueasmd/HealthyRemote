@@ -51,6 +51,7 @@ if not st.session_state.authenticated:
                     st.session_state.email = login_email
                     st.session_state.username = user_data['name']
                     st.session_state.authenticated = True
+                    st.session_state.chat_history = user_data.get('chat_history', [])
                     st.rerun()
                 except Exception as e:
                     st.error(f"Error during login: {str(e)}")
@@ -113,7 +114,7 @@ else:
             with col1:
                 st.metric(
                     label="Latest Stress Score",
-                    value=f"{user_data['assessments'][-1].get('stress_score', 0)}/10"
+                    value=f"{user_data['assessments'][0].get('stress_score', 0)}/10"
                 )
             with col2:
                 st.metric(
@@ -123,7 +124,7 @@ else:
             with col3:
                 st.metric(
                     label="Latest BMI",
-                    value=f"{user_data['assessments'][-1].get('bmi', 0):.1f}"
+                    value=f"{user_data['assessments'][0].get('bmi', 0):.1f}"
                 )
         else:
             st.info("👈 Start by taking your first assessment in the Assessment section!")
