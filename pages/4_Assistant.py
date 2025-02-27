@@ -153,10 +153,28 @@ Your current wellness metrics:
     if user_input:
         # Check if the user wants to continue
         if user_input.lower() == "continue":
-            # Retrieve the last response
+            # Retrieve the last response and add user message to state
             previous_response = st.session_state.get('last_response', "")
-            response = get_ai_response(st.session_state.user_id, user_input, previous_response)
+            st.session_state.messages.append({"role": "user", "content": "continue"})
+            save_chat_message(st.session_state.user_id, "user", "continue")
+            
+            # Track number of continuations in session state
+            if 'continuation_count' not in st.session_state:
+                st.session_state.continuation_count = 0
+            st.session_state.continuation_count += 1
+            
+            # Limit continuations to prevent endless stories
+            if st.session_state.continuation_count >= 2:
+                # On last continuation, ask for conclusion
+                response = get_ai_response(st.session_state.user_id, "Please continue but keep it concise and finish the story in this response.", previous_response)
+                # Reset continuation count
+                st.session_state.continuation_count = 0
+            else:
+                response = get_ai_response(st.session_state.user_id, user_input, previous_response)
         else:
+            # Reset continuation count for new conversations
+            st.session_state.continuation_count = 0
+            
             # Add user message to state and display
             st.session_state.messages.append({"role": "user", "content": user_input})
             save_chat_message(st.session_state.user_id, "user", user_input)
