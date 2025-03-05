@@ -1,15 +1,19 @@
 import streamlit as st
 from utils.database import get_user_data, save_chat_message, get_chat_history
-from utils.components import get_ai_response
+from utils.components import get_ai_response, interpret_bmi
 
 def format_user_metrics(user_data):
 
+    # Get BMI and its category
+    bmi_value = user_data['assessments'][0].get('bmi', 'N/A')
+    bmi_category = interpret_bmi(bmi_value) if bmi_value != 'N/A' else 'Not available'
+    
     """Format user metrics and history"""
     # Format metrics with bullet points
     metrics = f"""
 - 😌 Stress Level: {user_data['assessments'][0].get('stress_score', 'N/A')}/10
 - 🏃‍♂️ Activity Streak: {len(user_data.get('activities', []))} days
-- 📊 BMI: {user_data['assessments'][0].get('bmi', 'N/A')}"""
+- 📊 BMI: {bmi_value} ({bmi_category})"""
 
     # Format challenges list with compact spacing
     challenges_text = []

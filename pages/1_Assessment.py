@@ -12,7 +12,7 @@ from utils.recommendations import (
     get_activity_recommendations
 )
 from utils.database import save_assessment, get_assessments
-from utils.components import init_spotify_player
+from utils.components import init_spotify_player, interpret_bmi
 
 init_spotify_player()
 
@@ -23,25 +23,25 @@ with st.form("wellness_assessment"):
     st.subheader("Stress Assessment")
 
     work_stress = st.slider(
-        "How stressed do you feel about work?",
+        f"{st.session_state.username}, how stressed do you feel about work?",
         0, 10, 5,
         help="0 = Not stressed at all, 10 = Extremely stressed"
     )
 
     sleep_quality = st.slider(
-        "How would you rate your sleep quality?",
+        f"How would you rate your sleep quality, {st.session_state.username}?",
         0, 10, 5,
         help="0 = Very poor, 10 = Excellent"
     )
 
     anxiety_level = st.slider(
-        "How would you rate your anxiety level?",
+        f"{st.session_state.username}, how would you rate your anxiety level?",
         0, 10, 5,
         help="0 = No anxiety, 10 = Severe anxiety"
     )
 
     work_life_balance = st.slider(
-        "How satisfied are you with your work-life balance?",
+        f"How satisfied are you with your work-life balance, {st.session_state.username}?",
         0, 10, 5,
         help="0 = Very unsatisfied, 10 = Very satisfied"
     )
@@ -88,6 +88,10 @@ if submitted:
     stress_score = calculate_stress_score(stress_responses)
     bmi = calculate_bmi(weight, height)
     physical_evaluation = evaluate_physical_discomfort(pain_points)
+    
+    # After calculating BMI:
+    bmi_value = weight / ((height/100) ** 2)
+    bmi_category = interpret_bmi(bmi_value)
 
     # Store assessment results in database
     assessment_data = {
@@ -107,7 +111,9 @@ if submitted:
     with col1:
         st.metric("Stress Score", f"{stress_score}/10")
     with col2:
+        bmi_category = interpret_bmi(bmi)
         st.metric("BMI", f"{bmi:.1f}")
+        st.caption(f"Category: {bmi_category}")
     with col3:
         st.metric("Physical Discomfort", physical_evaluation['risk_level'])
 
@@ -138,6 +144,8 @@ if previous_assessments:
             with col1:
                 st.metric("Stress Score", f"{assessment['stress_score']}/10")
             with col2:
+                bmi_category = interpret_bmi(assessment['bmi'])
                 st.metric("BMI", f"{assessment['bmi']:.1f}")
+                st.caption(f"Category: {bmi_category}")
             with col3:
                 st.metric("Activity Level", assessment['activity_level'])

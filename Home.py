@@ -4,7 +4,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from utils.database import init_db, get_or_create_user, get_user_data, get_user_by_email, create_new_user, save_chat_message, get_chat_history
-from utils.components import init_spotify_player, get_ai_response  # Added get_ai_response here
+from utils.components import init_spotify_player, interpret_bmi, get_ai_response  # Added get_ai_response here
 
 # Page configuration
 st.set_page_config(
@@ -86,8 +86,8 @@ else:
 
     # Welcome message
     st.markdown(f"""
-    Welcome to your personal wellness companion, {st.session_state.username}! This platform is designed to help remote workers 
-    like you maintain and improve their physical and mental well-being.
+    Welcome to your personal wellness companion, {st.session_state.username}! <br><br>
+    This platform is designed to help remote workers like you maintain and improve their physical and mental well-being.
 
     ### What we offer:
     1. 📋 **Wellness Assessments** - Track your stress levels and physical health
@@ -96,7 +96,7 @@ else:
     4. 🧘‍♂️ **Virtual Health Assistant** - Get personalized recommendations for your well-being
     
     Get started by navigating to the Assessment section in the sidebar!
-    """)
+    """, unsafe_allow_html=True)
 
     # Logout button in sidebar
     if st.sidebar.button("Logout"):
@@ -122,10 +122,14 @@ else:
                     value=f"{len(user_data['activities'])} days"
                 )
             with col3:
+                bmi_value = user_data['assessments'][0].get('bmi', 0)
+                bmi_category = interpret_bmi(bmi_value)
                 st.metric(
                     label="Latest BMI",
-                    value=f"{user_data['assessments'][0].get('bmi', 0):.1f}"
+                    value=f"{bmi_value:.1f}",
+                    help=f"Ask the assistant or print the PDF Report (Progress section) to know more about your BMI"
                 )
+                st.caption(f"{bmi_category}")
         else:
             st.info("👈 Start by taking your first assessment in the Assessment section!")
     except Exception as e:

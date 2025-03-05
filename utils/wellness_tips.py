@@ -175,5 +175,23 @@ MOBILITY_TESTS = [
             "Fair": "Some difficulty with certain movements",
             "Poor": "Limited movement or pain"
         }
+    },
+
+    {
+        "name": "Lower Back and Hamstrings Mobility",
+        "description": "Assess flexibility of your lower back and hamstrings",
+        "instructions": [
+            "Stand with feet shoulder-width apart",
+            "Slowly bend backward slightly",
+            "Bend forward toward your toes",
+            "Perform gentle side bends",
+            "Note any pain or restrictions"
+        ],
+        "scoring": {
+            "Excellent": "Full bending range with no discomfort",
+            "Good": "Nearly full range with minor limitation",
+            "Fair": "Moderate restriction or mild discomfort",
+            "Poor": "Significant limitation or pain"
+        }
     }
 ]

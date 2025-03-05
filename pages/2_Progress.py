@@ -25,7 +25,7 @@ from utils.pdf_generator import generate_wellness_report
 import json
 from json import JSONEncoder
 
-from utils.components import init_spotify_player
+from utils.components import init_spotify_player, interpret_bmi
 
 init_spotify_player()
 

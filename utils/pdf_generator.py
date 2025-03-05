@@ -5,6 +5,8 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from io import BytesIO
 import base64
 from datetime import datetime
+from utils.components import interpret_bmi
+import streamlit as st
 
 def format_date(date_obj):
     """Format datetime object to string."""
@@ -26,19 +28,27 @@ def generate_wellness_report(user_data):
         fontSize=24,
         spaceAfter=30
     )
-    story.append(Paragraph("Wellness Report", title_style))
+    
+    # Get the username
+    username = st.session_state.get("username", user_data.get("name", "User"))
+    report_title = f"{username}'s Wellness Report"
+    story.append(Paragraph(report_title, title_style))
     story.append(Spacer(1, 20))
 
     # Latest Assessment Results
     if user_data['assessments']:
         latest = user_data['assessments'][0]  # Most recent assessment
         story.append(Paragraph("Latest Assessment", styles['Heading2']))
+        
+        # Get BMI interpretation
+        bmi_value = latest['bmi']
+        bmi_category = interpret_bmi(bmi_value)
 
         data = [
             ['Metric', 'Value'],
             ['Date', format_date(latest['date'])],
             ['Stress Score', f"{latest['stress_score']}/10"],
-            ['BMI', f"{latest['bmi']:.1f}"],
+            ['BMI', f"{latest['bmi']:.1f} ({bmi_category})"],
             ['Activity Level', latest['activity_level']],
             ['Physical Score', str(latest['physical_score'])]
         ]
@@ -119,11 +129,57 @@ def generate_wellness_report(user_data):
             ('GRID', (0, 0), (-1, -1), 1, colors.black)
         ]))
         story.append(weight_table)
+    
+    # BMI Information Section
+    story.append(Spacer(1, 20))
+    story.append(Paragraph("Understanding Your BMI", styles['Heading2']))
+
+    # Create intro paragraph
+    intro_text = "Body Mass Index (BMI) is a screening tool that can help indicate whether a person might be at an unhealthy weight."
+    story.append(Paragraph(intro_text, styles['Normal']))
+    story.append(Spacer(1, 10))
+
+    # Create categories header
+    story.append(Paragraph("BMI categories are generally defined as:", styles['Normal']))
+
+    # Create bullet styles with more precise control
+    bullet_style = ParagraphStyle(
+        'Bullet',
+        parent=styles['Normal'],
+        fontSize=10,
+        leading=14,  # Line height
+        leftIndent=30,  # Slightly more indent
+        firstLineIndent=-15,
+        spaceBefore=3,  # Add a tiny bit of space before each bullet
+        spaceAfter=3    # Add a tiny bit of space after each bullet
+    )
+
+    # Add each bullet point as a separate paragraph
+    bmi_categories = [
+        "• Under 18.5: Underweight - May indicate nutritional deficiency",
+        "• 18.5-24.9: Normal weight - Generally associated with good health",
+        "• 25-29.9: Overweight - May increase risk of certain health conditions",
+        "• 30-34.9: Obesity class I - Associated with higher health risks",
+        "• 35-39.9: Obesity class II - Associated with high health risks",
+        "• 40 and above: Obesity class III - Associated with very high health risks"
+    ]
+
+    for category in bmi_categories:
+        story.append(Paragraph(category, bullet_style))
+
+    # Add conclusion paragraph
+    conclusion_text = """BMI is just one screening tool and doesn't account for factors like muscle mass, bone density, or fat distribution.
+    It should be considered alongside other health metrics and your overall wellness."""
+    story.append(Spacer(1, 10))
+    story.append(Paragraph(conclusion_text, styles['Normal']))
+    story.append(Spacer(1, 15))
 
     # Recommendations
     story.append(Paragraph("Recommendations", styles['Heading2']))
+    story.append(Spacer(1, 5))  # Smaller space after heading
+
     for rec in user_data.get('recommendations', []):
-        story.append(Paragraph(f"• {rec}", styles['Normal']))
+        story.append(Paragraph(f"• {rec}", bullet_style))  # Use the same bullet style here
 
 
     # Generate PDF

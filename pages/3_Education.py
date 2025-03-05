@@ -1,7 +1,6 @@
-
 import streamlit as st
 import random
-from data.wellness_tips import (
+from utils.wellness_tips import (
     DAILY_TIPS, 
     ERGONOMIC_GUIDELINES, 
     STRETCHING_EXERCISES,
@@ -73,16 +72,41 @@ with tabs[2]:
         with st.expander(f"🔍 {test['name']}"):
             st.write(f"**Purpose**: {test['description']}")
 
-            st.subheader("Instructions:")
-            for instruction in test['instructions']:
-                st.write(f"• {instruction}")
+            # Create two columns for instructions and image
+            col1, col2 = st.columns([1, 3])  # Adjust the column sizes as needed
+
+            with col1:
+                st.subheader("Instructions:")
+                for instruction in test['instructions']:
+                    st.write(f"• {instruction}")
+
+            with col2:
+                image_path = f"/workspaces/HealthyRemote/data/images/{test['name'].replace(' ', '_').lower()}_test.png"
+                try:
+                    # Use width parameter to control image size instead of use_column_width
+                    st.image(
+                        image_path, 
+                        caption=f"{test['name']} Test", 
+                        use_container_width=False,  # Don't use full container width
+                        width=400  # Set a specific width in pixels
+                    )
+                except Exception as e:
+                    st.error(f"Image not available")
+
 
             st.subheader("Rate Your Performance:")
+            # Create formatted options that include both level and description
+            formatted_options = [f"{level}: {description}" for level, description in test['scoring'].items()]
+
+            # Display the selectbox with the formatted options
             score = st.selectbox(
-                "How would you rate your performance?",
-                list(test['scoring'].keys()),
+                f"{st.session_state.username}, how would you rate your performance?",
+                formatted_options,
                 key=f"mobility_{test['name']}"
             )
+
+            # Extract just the level (e.g., "Excellent") from the selected option for database storage
+            selected_level = score.split(':', 1)[0] if ':' in score else score
 
             notes = st.text_area(
                 "Additional Notes (optional):",

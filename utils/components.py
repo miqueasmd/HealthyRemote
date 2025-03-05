@@ -2,6 +2,7 @@ import streamlit as st
 from typing import List, Dict
 from openai import OpenAI
 from .database import save_chat_message, get_chat_history, get_user_data
+import re
 
 def init_spotify_player():
     # Define music playlists
@@ -66,6 +67,13 @@ def get_ai_response(user_id: int, user_message: str, previous_response: str = ""
             for assessment in user_data['assessments']
         ])
         
+        # Add comprehensive assessment history
+        assessment_history = "\n".join([
+            f"- Date: {a['date'].strftime('%Y-%m-%d')}, Stress Score: {a.get('stress_score', 'N/A')}, " + 
+            f"BMI: {a.get('bmi', 'N/A')} ({interpret_bmi(a.get('bmi', 'N/A'))})"
+            for a in user_data['assessments']
+        ])
+        
         # Track if we recently told a story
         recently_told_story = False
         latest_story = None
@@ -89,6 +97,10 @@ def get_ai_response(user_id: int, user_message: str, previous_response: str = ""
         is_asking_about_user_story = any(phrase in user_message.lower() for phrase in 
             ["my story", "my health story", "my journey", "my health journey", "my data story"])
         
+        # Get BMI value and interpretation
+        bmi_value = user_data['assessments'][0]['bmi'] if user_data['assessments'] else 'No data'
+        bmi_category = interpret_bmi(bmi_value) if bmi_value != 'No data' else 'No data'
+        
         # Add more context to system message
         system_content = f"""You are HealthyRemote, a wellness assistant for {user_data['name']}. 
 You have access to their complete health records, previous conversation context, and previous assessments:
@@ -96,7 +108,10 @@ You have access to their complete health records, previous conversation context,
 1. Weight History: {[f"{w['date'].strftime('%Y-%m-%d')}: {w['weight']}kg" for w in user_data['weight_logs']]}
 2. Latest Assessment:
    - Stress Score: {user_data['assessments'][0]['stress_score'] if user_data['assessments'] else 'No data'}
-   - BMI: {user_data['assessments'][0]['bmi'] if user_data['assessments'] else 'No data'}
+   - BMI: {bmi_value} ({bmi_category})
+3. Assessment History:
+{assessment_history}
+
 3. Activity History: {len(user_data['activities'])} activities recorded
 4. Stress History: {[f"{s['date'].strftime('%Y-%m-%d')}: {s['stress_score']}/10" for s in user_data['stress_logs']]}
 5. Active Challenges: {[c['challenge_name'] for c in user_data['active_challenges']]}
@@ -240,65 +255,110 @@ Important formatting instructions:
         formatted_response = formatted_response.replace("Would you like to see.", "")
         
         # Determine if continuation prompt should be added
+        response_word_count = len(formatted_response.split())
+
+        # Check for conclusion markers or data completion phrases
+        data_completion_phrases = [
+            "that's all the information",
+            "this completes your data",
+            "those are all your records",
+            "if you have any questions",
+            "if you need any further",
+            "if you have any specific questions",
+            "feel free to ask"
+        ]
+
+        # Detect if response has properly concluded
+        is_data_complete = any(phrase in formatted_response.lower() for phrase in data_completion_phrases)
+        has_conclusion_phrase = any(phrase in formatted_response.lower() for phrase in 
+            ["concludes", "conclusion", "the end", "end of the story", "this concludes"])
+            
+        # If data is complete or has conclusion phrase, mark as concluded
+        has_conclusion = has_conclusion_phrase or is_data_complete
+
+        # Check if the response ends with proper punctuation
+        is_complete_thought = formatted_response.rstrip().endswith(('.', '?', '!'))
+
+        # Check if we're about to cut off in the middle of content
+        is_cut_off = response_word_count > 90 and not is_complete_thought and not has_conclusion
+
+        # Check if this ends with a data item (like a number or measurement)
+        ends_with_data_item = bool(re.search(r'(\d+\.|\d+\)|\d+kg|/10|\(\w+\))$', formatted_response.strip()))
+
+        # Check for "thank you" style closures
+        has_closing_phrase = formatted_response.rstrip().endswith(('Thank you.', 'You\'re welcome.', 
+            'No problem.', 'Feel free to ask.', 'Let me know if you need anything else.'))
+
+        # Add these definitions before the should_add_prompt check:
+
+        # Check characteristics of the response
         is_story_response = any(phrase in formatted_response.lower() for phrase in 
-            ["once upon a time", "there lived", "story", "journey", "adventure"]) or "concludes the story" in formatted_response.lower()
-            
-        # Also consider health narratives as stories
+            ["once upon a time", "there lived", "story", "journey", "adventure"])
+
         is_health_narrative = any(phrase in user_message.lower() for phrase in 
-            ["my story", "health story", "journey", "narrative"]) or any(name in formatted_response.lower() for name in ["paco", "elara"])
+            ["my story", "health story", "journey", "narrative"])
             
-        # Detect if this is likely a data response
         is_data_response = any(term in user_message.lower() for term in
             ["records", "assessments", "logs", "data", "weight", "stress", "activities", 
-             "info", "everything", "about me", "know about me", "information"])
-        
-        # Check if the response contains significant amounts of user data
+            "info", "everything", "about me", "know about me", "information"])
+            
         contains_user_data = any(term in formatted_response.lower() for term in
             ["bmi", "stress score", "stress level", "weight", "kg", "assessment", "challenge"])
-        
-        # Check if this is an emotional/support response
+            
         is_emotional_response = any(term in user_message.lower() for term in
             ["sad", "angry", "upset", "depressed", "anxious", "feeling down", "not well", "tired", "exhausted", "help me"])
-        
-        # Add continuation prompt for long responses that aren't answers to "is it finished" questions
-        response_word_count = len(formatted_response.split())
+
+        # Then use these in the should_add_prompt condition (rest is the same)
         should_add_prompt = (
-            # Not asking if the story is over
+            # Basic conditions that must be met
             not is_asking_about_ending and 
-            
-            # Not already finishing a story
             "finish the story" not in user_message and
+            not has_conclusion and
+            not has_closing_phrase and
+            not ends_with_data_item and
             
-            # Response is long enough
-            response_word_count > 100 and
+            # Response must be long enough to potentially need continuation
+            response_word_count >= 100 and
             
-            # Either it's a story OR it's a data response WITH LOTS OF DATA
-            # But NOT an emotional support response
+            # Either it's narrative content OR data with significant volume
             (is_story_response or is_health_narrative or 
-             (is_data_response and contains_user_data and response_word_count > 150)) and
+            (is_data_response and contains_user_data and response_word_count > 150)) and
             
             # Not an emotional support response
             not is_emotional_response
         )
-        
-        # Don't add continuation prompt if we already added a conclusion
-        has_conclusion = any(phrase in formatted_response.lower() for phrase in 
-            ["concludes", "conclusion", "the end", "end of the story", "this concludes"])
-        
+
         # Handle the third continuation for stories to force a conclusion
         if user_message.lower() == "continue" and "continuation_count" in st.session_state:
             if st.session_state.continuation_count >= 2:
                 has_conclusion = True  # Force no continuation prompt on third continue
                 if "this concludes" not in formatted_response.lower():
                     formatted_response += "\n\nThis concludes the story."
-        
-        # Check if we're about to cut off in the middle
-        is_cut_off = response_word_count > 90 and not formatted_response.endswith(".") and not has_conclusion
-        
-        if (should_add_prompt or is_cut_off) and not has_conclusion and "Would you like to see more" not in formatted_response:
+
+        # Add continuation prompt only if needed and not already present
+        if (should_add_prompt or is_cut_off) and "Would you like to see more" not in formatted_response:
             formatted_response += "\n\nWould you like to see more?... (Write 'continue')"
-        
+
         return formatted_response
         
     except Exception as e:
         return f"I apologize, but I encountered an error: {str(e)}"
+
+def interpret_bmi(bmi_value):
+    """Return interpretation of BMI value"""
+    try:
+        bmi = float(bmi_value)
+        if bmi < 18.5:
+            return "Underweight"
+        elif bmi < 25:
+            return "Normal weight"
+        elif bmi < 30:
+            return "Overweight"
+        elif bmi < 35:
+            return "Obesity class I"
+        elif bmi < 40:
+            return "Obesity class II"
+        else:
+            return "Obesity class III"
+    except (ValueError, TypeError):
+        return "Unknown"
