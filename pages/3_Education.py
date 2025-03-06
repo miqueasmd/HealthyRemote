@@ -1,5 +1,7 @@
 import streamlit as st
 import random
+import os
+import pathlib
 from utils.wellness_tips import (
     DAILY_TIPS, 
     ERGONOMIC_GUIDELINES, 
@@ -81,17 +83,34 @@ with tabs[2]:
                     st.write(f"• {instruction}")
 
             with col2:
-                image_path = f"/workspaces/HealthyRemote/data/images/{test['name'].replace(' ', '_').lower()}_test.png"
+                # Use relative path that works both locally and on Streamlit Cloud
+                current_dir = pathlib.Path(__file__).parent.parent
+                image_filename = f"{test['name'].replace(' ', '_').lower()}_test.png"
+                image_path = os.path.join(current_dir, "data", "images", image_filename)
+                
                 try:
-                    # Use width parameter to control image size instead of use_column_width
-                    st.image(
-                        image_path, 
-                        caption=f"{test['name']} Test", 
-                        use_container_width=False,  # Don't use full container width
-                        width=400  # Set a specific width in pixels
-                    )
+                    # Check if file exists
+                    if os.path.exists(image_path):
+                        st.image(
+                            image_path, 
+                            caption=f"{test['name']} Test", 
+                            use_container_width=False,
+                            width=400
+                        )
+                    else:
+                        # Try alternate path for Streamlit cloud
+                        alt_image_path = os.path.join("data", "images", image_filename)
+                        if os.path.exists(alt_image_path):
+                            st.image(
+                                alt_image_path, 
+                                caption=f"{test['name']} Test", 
+                                use_container_width=False,
+                                width=400
+                            )
+                        else:
+                            st.error(f"Image not available")
                 except Exception as e:
-                    st.error(f"Image not available")
+                    st.error(f"Error displaying image: {str(e)}")
 
 
             st.subheader("Rate Your Performance:")
