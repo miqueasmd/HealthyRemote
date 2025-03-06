@@ -7,8 +7,8 @@ HealthyRemote is a comprehensive wellness platform designed for remote workers. 
 **Try the live application**: [https://healthyremote.streamlit.app/](https://healthyremote.streamlit.app/)
 
 **Test credentials**:
-- Username: Paco | Email: paco@example.com
-- Username: Paca | Email: paca@example.com
+- Username: paco | Email: paco@example.com
+- Username: paca | Email: paca@example.com
 
 ## Features
 
