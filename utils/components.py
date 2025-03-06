@@ -5,6 +5,7 @@ from .database import save_chat_message, get_chat_history, get_user_data
 import re
 
 def init_spotify_player():
+    """Initialize Spotify player in sidebar"""
     # Define music playlists
     MUSIC_PLAYLISTS = {
         "latin": "37i9dQZF1DX10zKzsJ2jva",
@@ -45,6 +46,7 @@ def init_spotify_player():
     """, unsafe_allow_html=True)
 
 def get_ai_response(user_id: int, user_message: str, previous_response: str = "") -> str:
+    """Generate AI response to user message with context awareness"""
     try:
         client = OpenAI()
         
@@ -55,17 +57,18 @@ def get_ai_response(user_id: int, user_message: str, previous_response: str = ""
         conversation_history = user_data.get('chat_history', [])
         # Take only the last 15 messages to avoid token limits
         recent_history = conversation_history[-15:] if len(conversation_history) > 15 else conversation_history
-        conversation_context = "\n".join([f"{msg['role']}: {msg['content']}" for msg in recent_history])
-
-        # Include previous response if available
-        if previous_response:
-            conversation_context += f"\nAssistant: {previous_response}"
-
-        # Create a formatted string for all assessments
-        assessments_info = "\n".join([
-            f"- Date: {assessment['date']}, Stress Score: {assessment['stress_score']}, BMI: {assessment['bmi']}"
-            for assessment in user_data['assessments']
-        ])
+        
+        # Check if this is a continuation request
+        is_continuation_request = ("continue" in user_message.lower() or 
+                                  user_message.lower() in ["more", "go on", "what's next", "proceed"])
+            
+        # Check if user is asking about "my story" or "my health journey"
+        is_asking_about_health_journey = any(phrase in user_message.lower() for phrase in 
+            ["my journey", "my health journey", "my progress", "my health progress", "my data story"])
+        
+        # Get BMI value and interpretation
+        bmi_value = user_data['assessments'][0]['bmi'] if user_data['assessments'] else 'No data'
+        bmi_category = interpret_bmi(bmi_value) if bmi_value != 'No data' else 'No data'
         
         # Add comprehensive assessment history
         assessment_history = "\n".join([
@@ -74,34 +77,7 @@ def get_ai_response(user_id: int, user_message: str, previous_response: str = ""
             for a in user_data['assessments']
         ])
         
-        # Track if we recently told a story
-        recently_told_story = False
-        latest_story = None
-        
-        # Get the last 3 exchanges to check for a recent story
-        for i, msg in enumerate(reversed(recent_history)):
-            if i >= 6:  # Look at last 3 exchanges (user+assistant)
-                break
-                
-            if msg['role'] == 'assistant':
-                if "This concludes the story" in msg['content'] or "Would you like to see more" in msg['content']:
-                    recently_told_story = True
-                    latest_story = msg['content']
-                    break
-        
-        # Check if user is asking about story ending
-        is_asking_about_ending = any(phrase in user_message.lower() for phrase in 
-            ["end of story", "story end", "finished", "is that the end", "is that all", "is it over", "that was short"])
-            
-        # Check if user is asking about "my story" or "my health story"
-        is_asking_about_user_story = any(phrase in user_message.lower() for phrase in 
-            ["my story", "my health story", "my journey", "my health journey", "my data story"])
-        
-        # Get BMI value and interpretation
-        bmi_value = user_data['assessments'][0]['bmi'] if user_data['assessments'] else 'No data'
-        bmi_category = interpret_bmi(bmi_value) if bmi_value != 'No data' else 'No data'
-        
-        # Add more context to system message
+        # Build system message with user data context
         system_content = f"""You are HealthyRemote, a wellness assistant for {user_data['name']}. 
 You have access to their complete health records, previous conversation context, and previous assessments:
 
@@ -111,27 +87,18 @@ You have access to their complete health records, previous conversation context,
    - BMI: {bmi_value} ({bmi_category})
 3. Assessment History:
 {assessment_history}
-
-3. Activity History: {len(user_data['activities'])} activities recorded
-4. Stress History: {[f"{s['date'].strftime('%Y-%m-%d')}: {s['stress_score']}/10" for s in user_data['stress_logs']]}
-5. Active Challenges: {[c['challenge_name'] for c in user_data['active_challenges']]}
+4. Activity History: {len(user_data['activities'])} activities recorded
+5. Stress History: {[f"{s['date'].strftime('%Y-%m-%d')}: {s['stress_score']}/10" for s in user_data['stress_logs']]}
+6. Active Challenges: {[c['challenge_name'] for c in user_data['active_challenges']]}
 
 Important formatting instructions:
 - Keep paragraphs short (2-4 sentences max)
 - Add line breaks between paragraphs
-- When telling stories, use shorter paragraphs similar to a novel
-- When asked to "continue" a story, always reference what happened in the previous response
-- When asked if a story is complete or ended, confirm clearly whether it's the end or not
-- Always add a clear ending sentence like "This concludes the story" when finishing a story
+- When asked to "continue", always reference what was previously discussed and provide additional relevant information
 - When providing user data or health information, always format it clearly with headers and line breaks
-- Remember that when the user says "continue", they want you to continue what you were just talking about"""
+- When discussing the user's health journey, provide insights based on their data in a supportive, encouraging manner"""
 
-        # If we recently told a story, add reminder about it
-        if recently_told_story:
-            system_content += "\n\nYou recently told a story that concluded or paused. If the user asks about 'the story', they are referring to this recent narrative."
-            
-        # Add reminder about health stories
-        system_content += "\n\nWhen talking about 'my story' or 'my health journey', the user is referring to a narrative about their health data and progress. Treat these as stories too."
+        system_content += "\n\nWhen talking about 'my journey' or 'my health journey', the user is referring to their personal health data and progress. Provide meaningful insights and patterns from their data."
             
         system_message = {
             "role": "system",
@@ -140,78 +107,32 @@ Important formatting instructions:
         
         messages = [system_message]
         
-        # Find last story in conversation history
-        last_story = None
-        for msg in reversed(conversation_history):
-            if msg['role'] == 'assistant' and any(phrase in msg['content'].lower() for phrase in 
-                ["once upon a time", "there lived", "story", "journey", "adventure", "this concludes the story"]):
-                last_story = msg['content']
-                break
-        
-        # Handle specific types of messages
-        if is_asking_about_ending and is_asking_about_user_story:
-            # They're asking about their health story/journey
-            messages.append({"role": "system", "content": "The user is asking about their health story you just shared. Confirm whether it's complete and summarize the key points of their health journey."})
-            messages.append({"role": "assistant", "content": previous_response})
+        # Handle different message types based on context
+        if is_asking_about_health_journey:
             messages.append({"role": "user", "content": user_message})
+            messages.append({"role": "system", "content": "Analyze the user's health data to create a meaningful summary of their wellness journey. Include key trends, improvements, and areas that may need attention. Be supportive and encouraging."})
             
-        elif is_asking_about_ending:
-            # For general story ending questions
-            if "This concludes the story" in previous_response:
-                messages.append({"role": "system", "content": "The story has concluded. Confirm this to the user and briefly reflect on the story's message."})
-            elif "Would you like to see more" in previous_response:
-                messages.append({"role": "system", "content": "The story is NOT complete. Tell the user they can type 'continue' to see more."})
-            else:
-                # Look for the most recent story conclusion in history
-                for msg in reversed(conversation_history):
-                    if msg['role'] == 'assistant' and "This concludes the story" in msg['content']:
-                        messages.append({"role": "system", "content": "The user is asking about a story you previously completed. Confirm that it was concluded."})
-                        break
-            
-            messages.append({"role": "assistant", "content": previous_response})
-            messages.append({"role": "user", "content": user_message})
-            
-        elif user_message.lower() == "continue" and previous_response:
+        elif is_continuation_request and previous_response:
             # Get last response and tell the API to continue from there
             messages.append({"role": "assistant", "content": previous_response})
-            messages.append({"role": "user", "content": "Please continue from where you left off. Keep paragraphs short (2-3 sentences)."})
-            
-        elif user_message.lower() == "continue" and last_story and not previous_response:
-            # If no previous response but we have a story in history, use that
-            messages.append({"role": "assistant", "content": last_story})
-            messages.append({"role": "user", "content": "Please continue the story from where you left off. Keep paragraphs short (2-3 sentences)."})
-            
-        elif user_message == "Please continue but keep it concise and finish the story in this response." and previous_response:
-            messages.append({"role": "assistant", "content": previous_response})
-            messages.append({"role": "user", "content": "Please continue and conclude the story. Keep paragraphs short (2-3 sentences) and make sure to provide a satisfying ending. End with 'This concludes the story.'"})
+            messages.append({"role": "system", "content": 
+                "Continue providing information on the previous topic. Add more details, recommendations, or analysis as appropriate."
+            })
+            messages.append({"role": "user", "content": "Please continue with more information on this topic."})
             
         else:
-            # Check if this is a request for a story
-            is_story_request = any(phrase in user_message.lower() for phrase in 
-                ["tell me a story", "tell a story", "share a story", "story about", "make up a story", "long story"])
-            
-            # Check if this is a request for user data or health story
+            # Check for specific request types to customize instructions
             is_data_request = any(phrase in user_message.lower() for phrase in
                 ["my data", "my information", "my records", "my history", "my assessments", "my logs", 
                  "info about me", "tell me about me", "everything about me", "all the info", "all my data"])
-                 
-            is_health_story_request = any(phrase in user_message.lower() for phrase in
-                ["my story", "tell me my story", "my health story", "my health journey", "based on my records", 
-                 "story of my health", "narrative about me", "health narrative", "know about me"])
             
-            if is_story_request:
-                # Add specific instruction for story endings
-                messages.append({"role": "user", "content": user_message})
-                messages.append({"role": "system", "content": "Tell an engaging story with a clear beginning, middle, and end. When you complete the final part of a story, always clearly state 'This concludes the story.' at the end."})
-            elif is_data_request:
+            if is_data_request:
                 messages.append({"role": "user", "content": user_message})
                 messages.append({"role": "system", "content": "Provide the user's data in a clear, organized format with headers and bullet points. Include all relevant information from their health records."})
-            elif is_health_story_request:
-                messages.append({"role": "user", "content": user_message})
-                messages.append({"role": "system", "content": "Create a narrative about the user's health journey based on their data. Make it personal and engaging. When you complete the story, clearly state 'This concludes the story.' at the end."})
             else:
                 messages.append({"role": "user", "content": user_message})
         
+        # Generate response
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=messages,
@@ -221,128 +142,117 @@ Important formatting instructions:
         
         response_text = response.choices[0].message.content
         
-        # Fix for duplicate "Would you like to see" text
-        response_text = response_text.replace("Would you like to see.\n\n", "")
-        response_text = response_text.replace("Would you like to see.\n", "")
-        response_text = response_text.replace("Would you like to see.", "")
+        # Process response for better formatting
+        formatted_response = format_response_text(response_text)
         
-        # Improve paragraph formatting by breaking up long paragraphs
-        sentences = response_text.split('. ')
-        formatted_paragraphs = []
-        current_paragraph = []
-        
-        for sentence in sentences:
-            if not sentence.strip():
-                continue
-                
-            current_paragraph.append(sentence)
-            
-            # After 2-3 sentences or if the sentence ends with a quotation mark, create a new paragraph
-            if len(current_paragraph) >= 2 or sentence.endswith('"') or sentence.endswith("'"):
-                formatted_paragraphs.append('. '.join(current_paragraph) + ('.' if not current_paragraph[-1].endswith('.') else ''))
-                current_paragraph = []
-        
-        # Add any remaining sentences as a final paragraph
-        if current_paragraph:
-            formatted_paragraphs.append('. '.join(current_paragraph) + ('.' if not current_paragraph[-1].endswith('.') else ''))
-        
-        # Join paragraphs with double newlines
-        formatted_response = '\n\n'.join(formatted_paragraphs)
-        
-        # Fix for duplicate "Would you like to see" text
-        formatted_response = formatted_response.replace("Would you like to see.\n\n", "")
-        formatted_response = formatted_response.replace("Would you like to see.\n", "")
-        formatted_response = formatted_response.replace("Would you like to see.", "")
-        
-        # Determine if continuation prompt should be added
-        response_word_count = len(formatted_response.split())
-
-        # Check for conclusion markers or data completion phrases
-        data_completion_phrases = [
-            "that's all the information",
-            "this completes your data",
-            "those are all your records",
-            "if you have any questions",
-            "if you need any further",
-            "if you have any specific questions",
-            "feel free to ask"
-        ]
-
-        # Detect if response has properly concluded
-        is_data_complete = any(phrase in formatted_response.lower() for phrase in data_completion_phrases)
-        has_conclusion_phrase = any(phrase in formatted_response.lower() for phrase in 
-            ["concludes", "conclusion", "the end", "end of the story", "this concludes"])
-            
-        # If data is complete or has conclusion phrase, mark as concluded
-        has_conclusion = has_conclusion_phrase or is_data_complete
-
-        # Check if the response ends with proper punctuation
-        is_complete_thought = formatted_response.rstrip().endswith(('.', '?', '!'))
-
-        # Check if we're about to cut off in the middle of content
-        is_cut_off = response_word_count > 90 and not is_complete_thought and not has_conclusion
-
-        # Check if this ends with a data item (like a number or measurement)
-        ends_with_data_item = bool(re.search(r'(\d+\.|\d+\)|\d+kg|/10|\(\w+\))$', formatted_response.strip()))
-
-        # Check for "thank you" style closures
-        has_closing_phrase = formatted_response.rstrip().endswith(('Thank you.', 'You\'re welcome.', 
-            'No problem.', 'Feel free to ask.', 'Let me know if you need anything else.'))
-
-        # Add these definitions before the should_add_prompt check:
-
-        # Check characteristics of the response
-        is_story_response = any(phrase in formatted_response.lower() for phrase in 
-            ["once upon a time", "there lived", "story", "journey", "adventure"])
-
-        is_health_narrative = any(phrase in user_message.lower() for phrase in 
-            ["my story", "health story", "journey", "narrative"])
-            
-        is_data_response = any(term in user_message.lower() for term in
-            ["records", "assessments", "logs", "data", "weight", "stress", "activities", 
-            "info", "everything", "about me", "know about me", "information"])
-            
-        contains_user_data = any(term in formatted_response.lower() for term in
-            ["bmi", "stress score", "stress level", "weight", "kg", "assessment", "challenge"])
-            
-        is_emotional_response = any(term in user_message.lower() for term in
-            ["sad", "angry", "upset", "depressed", "anxious", "feeling down", "not well", "tired", "exhausted", "help me"])
-
-        # Then use these in the should_add_prompt condition (rest is the same)
-        should_add_prompt = (
-            # Basic conditions that must be met
-            not is_asking_about_ending and 
-            "finish the story" not in user_message and
-            not has_conclusion and
-            not has_closing_phrase and
-            not ends_with_data_item and
-            
-            # Response must be long enough to potentially need continuation
-            response_word_count >= 100 and
-            
-            # Either it's narrative content OR data with significant volume
-            (is_story_response or is_health_narrative or 
-            (is_data_response and contains_user_data and response_word_count > 150)) and
-            
-            # Not an emotional support response
-            not is_emotional_response
+        # Determine if we should add a continuation prompt
+        should_add_prompt = should_add_continuation_prompt(
+            formatted_response, 
+            user_message
         )
 
-        # Handle the third continuation for stories to force a conclusion
-        if user_message.lower() == "continue" and "continuation_count" in st.session_state:
-            if st.session_state.continuation_count >= 2:
-                has_conclusion = True  # Force no continuation prompt on third continue
-                if "this concludes" not in formatted_response.lower():
-                    formatted_response += "\n\nThis concludes the story."
-
         # Add continuation prompt only if needed and not already present
-        if (should_add_prompt or is_cut_off) and "Would you like to see more" not in formatted_response:
+        if should_add_prompt and "Would you like to see more" not in formatted_response:
             formatted_response += "\n\nWould you like to see more?... (Write 'continue')"
 
         return formatted_response
         
     except Exception as e:
         return f"I apologize, but I encountered an error: {str(e)}"
+
+def format_response_text(response_text):
+    """Format the AI response for better readability"""
+    # Fix for duplicate "Would you like to see" text
+    response_text = response_text.replace("Would you like to see.\n\n", "")
+    response_text = response_text.replace("Would you like to see.\n", "")
+    response_text = response_text.replace("Would you like to see.", "")
+    
+    # Improve paragraph formatting by breaking up long paragraphs
+    sentences = response_text.split('. ')
+    formatted_paragraphs = []
+    current_paragraph = []
+    
+    for sentence in sentences:
+        if not sentence.strip():
+            continue
+            
+        current_paragraph.append(sentence)
+        
+        # After 2-3 sentences or if the sentence ends with a quotation mark, create a new paragraph
+        if len(current_paragraph) >= 2 or sentence.endswith('"') or sentence.endswith("'"):
+            formatted_paragraphs.append('. '.join(current_paragraph) + ('.' if not current_paragraph[-1].endswith('.') else ''))
+            current_paragraph = []
+    
+    # Add any remaining sentences as a final paragraph
+    if current_paragraph:
+        formatted_paragraphs.append('. '.join(current_paragraph) + ('.' if not current_paragraph[-1].endswith('.') else ''))
+    
+    # Join paragraphs with double newlines
+    return '\n\n'.join(formatted_paragraphs)
+
+def should_add_continuation_prompt(formatted_response, user_message):
+    """Determine if we should add a continuation prompt"""
+    # Calculate response length
+    response_word_count = len(formatted_response.split())
+    
+    # Comprehensive list of conclusion and completion phrases
+    data_completion_phrases = [
+        "that's all the information", "this completes your data", "those are all your records",
+        "if you have any questions", "if you need any further", "if you have any specific questions",
+        "feel free to ask", "i'm here to help", "i am here to help", "here to help",
+        "happy to assist", "i'm here if you", "hope this helps", "let me know if"
+    ]
+    
+    # Check response characteristics
+    is_health_narrative = any(phrase in user_message.lower() for phrase in 
+        ["my journey", "health journey", "progress", "narrative"])
+        
+    is_data_response = any(term in user_message.lower() for term in [
+        "records", "assessments", "logs", "data", "weight", "stress", "activities", 
+        "info", "everything", "about me", "know about me", "information"
+    ])
+        
+    contains_user_data = any(term in formatted_response.lower() for term in 
+        ["bmi", "stress score", "stress level", "weight", "kg", "assessment", "challenge"])
+        
+    is_emotional_response = any(term in user_message.lower() for term in 
+        ["sad", "angry", "upset", "depressed", "anxious", "feeling down", "not well", "tired", "exhausted", "help me"])
+    
+    # Comprehensive checks for response completeness
+    is_data_complete = any(phrase in formatted_response.lower() for phrase in data_completion_phrases)
+    is_complete_thought = formatted_response.rstrip().endswith(('.', '?', '!'))
+    ends_with_data_item = bool(re.search(r'(\d+\.|\d+\)|\d+kg|/10|\(\w+\))$', formatted_response.strip()))
+    
+    # Check for closing phrases
+    has_closing_phrase = (
+        formatted_response.rstrip().endswith(('Thank you.', 'You\'re welcome.', 'No problem.', 
+                                           'Feel free to ask.', 'Let me know if you need anything else.')) or
+        any(phrase in formatted_response.lower()[-50:] for phrase in 
+            ['i\'m here to help', 'here to help', 'here to assist', 'happy to assist', 
+             'feel free to ask', 'let me know if', 'i\'m available'])
+    )
+    
+    # Check specifically for phrases that indicate the conclusion is the last 100 characters
+    has_conclusive_ending = any(phrase in formatted_response.lower()[-100:] for phrase in 
+        ["here to help", "happy to assist", "hope this helps", "let me know if", "feel free to", "i'm here", "i am here"])
+    
+    # Check if the response appears to be cut off
+    is_cut_off = response_word_count > 90 and not is_complete_thought and not (is_data_complete or has_closing_phrase)
+    
+    # Decision logic for adding continuation prompt
+    should_add_prompt = (
+        "finish" not in user_message.lower() and
+        not is_data_complete and
+        not has_closing_phrase and
+        not has_conclusive_ending and
+        not ends_with_data_item and
+        response_word_count >= 100 and
+        (is_health_narrative or 
+         (is_data_response and contains_user_data and response_word_count > 150)) and
+        not is_emotional_response
+    )
+    
+    return should_add_prompt or is_cut_off
 
 def interpret_bmi(bmi_value):
     """Return interpretation of BMI value"""
