@@ -177,4 +177,4 @@ Explore the features and see how it can support your health and wellness goals!
 
 If you have any questions, feedback, or contributions, feel free to contact.
 
-Happy coding and stay healthy!
+Happy remote work, and stay healthy!
