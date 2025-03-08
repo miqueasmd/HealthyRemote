@@ -178,3 +178,38 @@ Explore the features and see how it can support your health and wellness goals!
 If you have any questions, feedback, or contributions, feel free to contact.
 
 Happy remote work, and stay healthy!
+
+
+## References & Bibliography
+
+### Web References
+
+- ScanSource. (2023). Healthcare Industry Trends and Growth Forecast Infographic. Retrieved from https://www.scansource.com/~/media/Project/scansource/scansourceweb/Enablement/Programs/2023-vertical-marketing-program/2023-healthcare-infographic.pdf
+
+- Oakman, J., Kinsman, N., Stuckey, R., Graham, M., & Weale, V. (2024). Working from home—understanding the impacts on health. Journal of Occupational Health, 66(1), uiae005. https://academic.oup.com/joh/article/66/1/uiae005/7591974
+
+- CaseIQ. (2023). Health and Safety Issues When Employees are Working from Home. Retrieved from https://www.caseiq.com/resources/health-and-safety-issues-when-employees-are-working-from-home
+
+- McCall, A. (2023). Remote work poses risks to physical health. The Hill. Retrieved from https://thehill.com/changing-america/well-being/4076569-remote-work-poses-risks-to-physical-health
+
+- World Economic Forum. (2024, January). Remote work and the future of global digital jobs. Retrieved from https://www.weforum.org/stories/2024/01/remote-global-digital-jobs-whitepaper/
+
+- Forrester Research. (2022, November). Predictions 2023: Healthcare. Retrieved from https://www.forrester.com/blogs/predictions-2023-healthcare/
+
+### Academic References
+
+- Moretti, A., Menna, F., Aulicino, M., Paoletta, M., Liguori, S., & Iolascon, G. (2020). Characterization of home working population during COVID-19 emergency: A cross-sectional analysis. International Journal of Environmental Research and Public Health, 17(17), 6284.
+
+- Xiao, Y., Becerik-Gerber, B., Lucas, G., & Roll, S. C. (2021). Impacts of working from home during COVID-19 pandemic on physical and mental well-being of office workstation users. Journal of Occupational and Environmental Medicine, 63(3), 181-190.
+
+- Hadjidemetriou, G. M., Sasidharan, M., Kouyialis, G., & Parlikad, A. K. (2020). The impact of government measures and human mobility trend on COVID-19 related deaths in the UK. Transportation Research Interdisciplinary Perspectives, 6, 100167.
+
+- Kužnar, I., Žvanut, B., & Pucer, P. (2022). The effects of remote work on the physical health of workers during the COVID-19 pandemic: A systematic review. International Journal of Environmental Research and Public Health, 19(14), 8398.
+
+### Industry Reports
+
+- McKinsey & Company. (2023). The future of remote work: An analysis of 2,000 tasks, 800 jobs, and 9 countries. McKinsey Global Institute.
+
+- Deloitte. (2022). Digital health technology: Global trends in healthcare transformation. Deloitte Insights.
+
+- World Health Organization. (2021). Mental health and psychosocial considerations during the COVID-19 outbreak. WHO Reference Number: WHO/2019-nCoV/MentalHealth/2020.1.
