@@ -52,16 +52,22 @@ def get_ai_response(user_id: int, user_message: str, previous_response: str = ""
         
         # Get comprehensive user data
         user_data = get_user_data(user_id)
-
+        
+        # Check if this is a continuation request
+        is_continuation_request = ("continue" in user_message.lower() or 
+                                  user_message.lower() in ["more", "go on", "what's next", "proceed", "continuar"])
+                                  
+        # If it's a continuation and we have stored content, return that
+        if is_continuation_request and "remaining_response" in st.session_state:
+            formatted_response = st.session_state.remaining_response
+            del st.session_state.remaining_response
+            return formatted_response
+            
         # Create conversation context from chat history
         conversation_history = user_data.get('chat_history', [])
         # Take only the last 15 messages to avoid token limits
         recent_history = conversation_history[-15:] if len(conversation_history) > 15 else conversation_history
         
-        # Check if this is a continuation request
-        is_continuation_request = ("continue" in user_message.lower() or 
-                                  user_message.lower() in ["more", "go on", "what's next", "proceed"])
-            
         # Check if user is asking about "my story" or "my health journey"
         is_asking_about_health_journey = any(phrase in user_message.lower() for phrase in 
             ["my journey", "my health journey", "my progress", "my health progress", "my data story"])
@@ -132,7 +138,7 @@ Important formatting instructions:
             else:
                 messages.append({"role": "user", "content": user_message})
         
-        # Generate response
+        # Generate response with 300 tokens
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=messages,
@@ -141,19 +147,49 @@ Important formatting instructions:
         )
         
         response_text = response.choices[0].message.content
+        finish_reason = response.choices[0].finish_reason
         
         # Process response for better formatting
         formatted_response = format_response_text(response_text)
         
-        # Determine if we should add a continuation prompt
-        should_add_prompt = should_add_continuation_prompt(
-            formatted_response, 
-            user_message
-        )
-
-        # Add continuation prompt only if needed and not already present
-        if should_add_prompt and "Would you like to see more" not in formatted_response:
-            formatted_response += "\n\nWould you like to see more?... (Write 'continue')"
+        # Detect user language (simple approach)
+        is_spanish = any(word in user_message.lower() for word in 
+                      ["como", "qué", "porque", "gracias", "hola", "por favor", "puedes", "continuar"])
+        
+        # Create continuation message based on language
+        continue_message = "¿Quieres ver más?... (Escribe 'continuar')" if is_spanish else "Would you like to see more?... (Write 'continue')"
+        
+        # Handle response continuation
+        needs_continuation = False
+        
+        # Case 1: API indicates response was cut off
+        if finish_reason == "length":
+            needs_continuation = True
+        # Case 2: Our heuristics suggest the response might be incomplete
+        elif should_add_continuation_prompt(formatted_response, user_message) and "Would you like to see more" not in formatted_response:
+            needs_continuation = True
+            
+        # Generate and store continuation if needed
+        if needs_continuation:
+            # Generate the continuation response
+            continuation_messages = messages.copy()
+            continuation_messages.append({"role": "assistant", "content": response_text})
+            continuation_messages.append({"role": "system", "content": "Continue the previous response with additional relevant details."})
+            continuation_messages.append({"role": "user", "content": "Please continue with more information."})
+            
+            continuation_response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=continuation_messages,
+                temperature=0.7,
+                max_tokens=300
+            )
+            
+            # Store continuation for when user asks for more
+            st.session_state.remaining_response = format_response_text(continuation_response.choices[0].message.content)
+            
+            # Add continuation prompt to original response
+            if "Would you like to see more" not in formatted_response and "¿Quieres ver más?" not in formatted_response:
+                formatted_response += f"\n\n{continue_message}"
 
         return formatted_response
         
