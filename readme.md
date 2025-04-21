@@ -4,7 +4,7 @@
 HealthyRemote is a comprehensive wellness platform designed for remote workers. It helps users track their health metrics, participate in challenges, access educational content, and receive AI-powered wellness assistance to maintain a healthy lifestyle while working remotely.
 
 ## Live Demo
-**Try the live application**: [https://healthyremote.streamlit.app/](https://healthyremote.streamlit.app/)
+**Try the live application**: [https://app.mmdhealthyremote.es/](https://app.mmdhealthyremote.es/)
 
 **Test credentials**:
 - Username: paco | Email: paco@example.com
@@ -171,7 +171,7 @@ pip install -r requirements.txt
 ```
 
 ## Get Started Today!
-Ready to enhance your wellness journey? Access the HealthyRemote application live at [HealthyRemote](https://healthyremote.streamlit.app/). 
+Ready to enhance your wellness journey? Access the HealthyRemote application live at [HealthyRemote](https://app.mmdhealthyremote.es/). 
 
 Explore the features and see how it can support your health and wellness goals!
 
