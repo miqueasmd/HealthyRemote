@@ -16,9 +16,9 @@ st.set_page_config(
 
 init_spotify_player()
 
-# Add creator credits below Spotify player
+# Add creator credits below Spotify player with link
 st.sidebar.markdown("---")  # Add a divider
-st.sidebar.markdown("<div style='text-align: center; color: #555;'><small>Created by: <b>MMD</b><br>Miqueas Molina Delgado</small></div>", unsafe_allow_html=True)
+st.sidebar.markdown("<div style='text-align: center; color: #555;'><small>Created by: <b>MMD</b><br><a href='https://miqueasmd.github.io/' target='_blank'>Miqueas Molina Delgado</a></small></div>", unsafe_allow_html=True)
 
 # Initialize database
 init_db()
