@@ -12,7 +12,8 @@ HealthyRemote is a comprehensive wellness platform designed for remote workers. 
 
 **Watch the 2min demo**:
 
-[![HealthyRemote Demo](https://img.youtube.com/vi/y43PvfGzc58/0.jpg)](https://www.youtube.com/watch?v=y43PvfGzc58 "Watch the HealthyRemote Demo"){:target="_blank"}
+[![HealthyRemote Demo](https://img.youtube.com/vi/y43PvfGzc58/0.jpg)](https://www.youtube.com/watch?v=y43PvfGzc58)
+[▶️ Open video in new tab](https://www.youtube.com/watch?v=y43PvfGzc58)
 
 ## Features
 
