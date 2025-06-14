@@ -10,6 +10,9 @@ HealthyRemote is a comprehensive wellness platform designed for remote workers. 
 - Username: paco | Email: paco@example.com
 - Username: paca | Email: paca@example.com
 
+**Watch the 2min demo**:
+https://github.com/miqueasmd/HealthyRemote/blob/main/HealtyRemote_Demo.mp4
+
 ## Features
 
 ### Health Tracking
