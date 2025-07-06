@@ -1,0 +1,23 @@
+name: Deploy to DigitalOcean
+
+on:
+  push:
+    branches:
+      - main # Triggers only on push to main branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH and Deploy to Server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DO_HOST }}
+          username: ${{ secrets.DO_USER }}
+          key: ${{ secrets.DO_SSH_KEY }}
+          script: |
+            cd /root/HealthyRemote
+            git pull
+            echo "--> Code updated, restarting the app..."
+            sudo systemctl restart streamlit.service
+            echo "--> Deployment completed!" 
