@@ -18,6 +18,11 @@ jobs:
           script: |
             cd /root/HealthyRemote
             git pull
-            echo "--> Code updated, restarting the app..."
+            echo "--> Code updated. Installing/updating dependencies..."
+
+            # Activate virtual environment, install dependencies and deactivate
+            source env/bin/activate && pip install -r requirements.txt && deactivate
+            
+            echo "--> Dependencies ready. Restarting the application..."
             sudo systemctl restart streamlit.service
             echo "--> Deployment completed!" 
