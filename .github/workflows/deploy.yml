@@ -1,28 +1,45 @@
-name: Deploy to DigitalOcean
+name: Build & Deploy HealthyRemote
 
 on:
   push:
-    branches:
-      - main # Triggers only on push to main branch
+    branches: [main]
+
+env:
+  # Image name in GHCR: ghcr.io/<owner>/healthyremote
+  IMAGE: ghcr.io/${{ github.repository_owner }}/healthyremote
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read          # required for checkout
+      packages: write         # required to publish to GHCR
+
     steps:
-      - name: SSH and Deploy to Server
+      # 1) Checkout the repository
+      - uses: actions/checkout@v4
+
+      # 2) Build and push the container image (HealthyRemote folder only)
+      - name: Build & push container to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+               docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
+          docker build -t $IMAGE:${{ github.sha }} -t $IMAGE:latest HealthyRemote/
+          docker push $IMAGE:${{ github.sha }}
+          docker push $IMAGE:latest
+
+      # 3) Deploy to DigitalOcean Droplet via SSH
+      - name: Deploy to DigitalOcean
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.DO_HOST }}
-          username: ${{ secrets.DO_USER }}
-          key: ${{ secrets.DO_SSH_KEY }}
+          host: ${{ secrets.DO_HOST }}      # Droplet IP address (from secrets)
+          username: ${{ secrets.DO_USER }}  # SSH user (from secrets)
+          key: ${{ secrets.DO_SSH_KEY }}    # SSH private key (from secrets)
+          port: 22222                       # Change if using a different SSH port
           script: |
-            cd /root/HealthyRemote
-            git pull
-            echo "--> Code updated. Installing/updating dependencies..."
-
-            # Activate virtual environment, install dependencies and deactivate
-            source env/bin/activate && pip install -r requirements.txt && deactivate
-            
-            echo "--> Dependencies ready. Restarting the application..."
-            sudo systemctl restart streamlit.service
-            echo "--> Deployment completed!" 
+            cd /root/n8n-docker-caddy
+            docker compose pull healthyremote
+            docker compose up -d healthyremote
+            # Remove orphaned images older than 24h
+            docker image prune -f --filter="until=24h"
