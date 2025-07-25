@@ -39,6 +39,7 @@ jobs:
           port: 22222                       # Change if using a different SSH port
           script: |
             cd /root/n8n-docker-caddy
+            git pull origin main
             docker compose pull healthyremote
             docker compose up -d healthyremote
             # Remove orphaned images older than 24h
