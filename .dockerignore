@@ -1,6 +1,14 @@
-.git
-__pycache__
-*.png
-*.mp4
+
+# Avoid heavy or irrelevant files in Docker build
+__pycache__/
+env/
+*.pyc
 *.pdf
+*.mp4
+.devcontainer/
+.vs/
+.github/
+.gitignore
+.git
 data/
+*.png
