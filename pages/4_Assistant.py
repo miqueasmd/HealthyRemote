@@ -1,27 +1,23 @@
 import streamlit as st
 from utils.database import get_user_data, save_chat_message, get_chat_history
-from utils.components import get_ai_response, interpret_bmi
+from utils.components import get_ai_response
 
 def format_user_metrics(user_data):
-
-    # Get BMI and its category
-    bmi_value = user_data['assessments'][0].get('bmi', 'N/A')
-    bmi_category = interpret_bmi(bmi_value) if bmi_value != 'N/A' else 'Not available'
-    
     """Format user metrics and history"""
-    # Format metrics with bullet points
-    metrics = f"""
-- 😌 Stress Level: {user_data['assessments'][0].get('stress_score', 'N/A')}/10
-- 🏃‍♂️ Activity Streak: {len(user_data.get('activities', []))} days
-- 📊 BMI: {bmi_value} ({bmi_category})"""
-
-    # Format challenges list with compact spacing
+    # Get latest metrics
+    latest_assessment = user_data.get('assessments', [{}])[0]
+    metrics = {
+        'stress': latest_assessment.get('stress_score', 'Not measured'),
+        'bmi': latest_assessment.get('bmi', 'Not measured'),
+        'activity_streak': len(user_data.get('activities', []))
+    }
+    
+    # Format challenges list with proper indentation
     challenges_text = []
     if user_data.get('active_challenges'):
         for ch in user_data['active_challenges']:
             challenge_title = f"- 🌟 **{ch['challenge_name']} (Day {ch['progress']['current_day']})**"
             progress_tasks = "\n  - ".join([f"✅ {task}" for task in ch['progress'].get('completed_tasks', [])])
-            # Remove extra newline by directly connecting title with tasks
             challenges_text.append(f"{challenge_title}\n  - {progress_tasks}")
     
     
@@ -33,7 +29,7 @@ def format_user_metrics(user_data):
         'assessments': user_data.get('assessments', []),
     }
     
-    return metrics, historical_data, "\n".join(challenges_text)  # Remove extra newlines between challenges
+    return metrics, historical_data, "\n\n".join(challenges_text)  # Add extra newline for separation
 
 # Page configuration
 st.set_page_config(page_title="AI Wellness Assistant", page_icon="💬", layout="wide")
@@ -44,7 +40,7 @@ if not st.session_state.get("authenticated", False):
     st.stop()
 
 # Initialize chat interface
-st.title("💬 HealthyRemote, Your Personal Wellness Assistant")
+st.title("💬 Your Personal Wellness Assistant")
 
 # Create two columns for layout
 col1, col2 = st.columns([2, 1])
@@ -111,84 +107,74 @@ with col2:
 
 # Left column: Chat Interface
 with col1:
-    # Create a main container for messages
-    message_container = st.container()
-    
-    # Display messages in the message container
-    with message_container:
-        if "messages" not in st.session_state:
-            try:
-                # Get user data
-                user_data = get_user_data(st.session_state.user_id)
-                username = user_data['name']
-                metrics, historical_data, challenges_formatted = format_user_metrics(user_data)
+    if "messages" not in st.session_state:
+        try:
+            # Get user data
+            user_data = get_user_data(st.session_state.user_id)
+            username = user_data['name']
+            metrics, historical_data, challenges_formatted = format_user_metrics(user_data)
 
-                # Create initial greeting
-                initial_greeting = f"""Hello {username}! 👋
+            # Create initial greeting with properly formatted challenges
+            initial_greeting = f"""Hello {username}! 👋
 
 How are you feeling today?
 
 Your current wellness metrics:
-{metrics}
+😌 Stress Level: {metrics['stress']}/10
+🏃‍♂️ Activity Streak: {metrics['activity_streak']} days
+📊 BMI: {metrics['bmi']}
 
 🎯 Active Challenges:
 {challenges_formatted if challenges_formatted else "No active challenges at the moment."}
 """
-                # Initialize messages
-                st.session_state.messages = [
-                    {"role": "assistant", "content": initial_greeting, "visible": True}
-                ]
-            except Exception as e:
-                st.error(f"Error initializing chat: {str(e)}")
-                st.session_state.messages = [{"role": "assistant", 
-                    "content": "Hello! I'm your personal wellness assistant. How can I help you today?", 
-                    "visible": True}]
-
-        # Display existing messages
-        for message in st.session_state.messages:
-            if message.get("visible", True):
-                with st.chat_message(message["role"]):
-                    st.markdown(message["content"])
-    
-    # Chat input at the bottom
-    user_input = st.chat_input("Type your message here...")
-
-    # Process the message when submitted
-    if user_input:
-        # Check if the user wants to continue
-        if user_input.lower() == "continue":
-            # Retrieve the last response and add user message to state
-            previous_response = st.session_state.get('last_response', "")
-            st.session_state.messages.append({"role": "user", "content": "continue"})
-            save_chat_message(st.session_state.user_id, "user", "continue")
+            # Store messages
+            st.session_state.messages = [
+                {"role": "assistant", "content": initial_greeting, "visible": True}
+            ]
             
-            # Track number of continuations in session state
-            if 'continuation_count' not in st.session_state:
-                st.session_state.continuation_count = 0
-            st.session_state.continuation_count += 1
-            
-            # Limit continuations to prevent endless stories
-            if st.session_state.continuation_count >= 2:
-                # On last continuation, ask for conclusion
-                response = get_ai_response(st.session_state.user_id, "Please continue but keep it concise and finish the story in this response.", previous_response)
-                # Reset continuation count
-                st.session_state.continuation_count = 0
+        except Exception as e:
+            st.error(f"Error initializing chat: {str(e)}")
+            st.session_state.messages = [{"role": "assistant", 
+                "content": "Hello! I'm your personal wellness assistant. How can I help you today?", 
+                "visible": True}]
+
+    # Display chat messages
+    for message in st.session_state.messages:
+        if message.get("visible", True):
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+
+    # Chat input
+    if prompt := st.chat_input("Type your message here..."):
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        save_chat_message(st.session_state.user_id, "user", prompt)
+
+        with st.chat_message("assistant"):
+            # Check if it's a records request
+            if any(keyword in prompt.lower() for keyword in ["show records", "show history", "weight history", "stress history"]):
+                # Get fresh data
+                user_data = get_user_data(st.session_state.user_id)
+                metrics, historical_data, challenges = format_user_metrics(user_data)
+                
+                if "weight" in prompt.lower():
+                    response = """Here are your weight records:
+                    ```markdown
+                    | Date | Weight (kg) |
+                    |------|------------|
+                    {}
+                    ```
+                    """.format('\n'.join([
+                        f"|{w['date'].strftime('%Y-%m-%d')}|{w['weight']}|" 
+                        for w in historical_data['weight_logs']
+                    ]))
+                else:
+                    # Let AI handle other responses
+                    response = get_ai_response(st.session_state.user_id, prompt)
             else:
-                response = get_ai_response(st.session_state.user_id, user_input, previous_response)
-        else:
-            # Reset continuation count for new conversations
-            st.session_state.continuation_count = 0
-            
-            # Add user message to state and display
-            st.session_state.messages.append({"role": "user", "content": user_input})
-            save_chat_message(st.session_state.user_id, "user", user_input)
-
-            # Get and add AI response
-            response = get_ai_response(st.session_state.user_id, user_input)
-        
-        # Store the last response
-        st.session_state.last_response = response
+                response = get_ai_response(st.session_state.user_id, prompt)
+                
+            st.markdown(response)
         st.session_state.messages.append({"role": "assistant", "content": response})
-        
-        st.rerun()
 

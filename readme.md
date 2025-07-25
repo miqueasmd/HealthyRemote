@@ -115,11 +115,12 @@ HealthyRemote is a comprehensive wellness platform designed for remote workers. 
 2. Open your web browser and go to `http://localhost:8501` to access the application.
 
 ## Running with Docker
-HealthyRemote is containerized for easy deployment in any environment.
+
+HealthyRemote can be easily run in a Docker container for local development or deployment.
 
 ### Prerequisites for Docker
 - Docker installed on your machine
-- Docker Compose (optional, for easier management)
+- (Optional) Docker Compose for multi-service setups
 
 ### Using Docker
 1. Build the Docker image:
@@ -127,20 +128,22 @@ HealthyRemote is containerized for easy deployment in any environment.
    docker build -t healthyremote .
    ```
 
-2. Run the container:
+2. Make sure you have a `.env` file in the project root with your environment variables (e.g. `DATABASE_URL`, `OPENAI_API_KEY`).
+
+3. Run the container:
    ```sh
    docker run -p 8501:8501 --env-file .env healthyremote
    ```
 
-3. Access the application at `http://localhost:8501`
+4. Open your browser and go to `http://localhost:8501` to access the application.
 
 ### Using Docker Compose
-1. Start the application using the provided docker-compose.yml:
+If you have a `docker-compose.yml` file, you can start the application with:
    ```sh
    docker-compose up
    ```
 
-2. Access the application at `http://localhost:8501`
+Then access the app at `http://localhost:8501`.
 
 ## Deployment
 To deploy the application to Streamlit Cloud:
