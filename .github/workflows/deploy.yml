@@ -20,27 +20,40 @@ jobs:
       # 1) Checkout the repository
       - uses: actions/checkout@v4
 
-      # 2) Build and push the container image (HealthyRemote folder only)
-      - name: Build & push container to GHCR
+      # 2) Set up Docker Buildx for multi-arch builds
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 3) Login to GHCR
+      - name: Login to GHCR
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | \
                docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
-          docker build -t $IMAGE:${{ github.sha }} -t $IMAGE:latest .
-          docker push $IMAGE:${{ github.sha }}
-          docker push $IMAGE:latest
 
-      # 3) Deploy to DigitalOcean Droplet via SSH
-      - name: Deploy to DigitalOcean
+      # 4) Build and push multi-arch container image (amd64 + arm64)
+      - name: Build & push multi-arch container to GHCR
+        run: |
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            -t $IMAGE:${{ github.sha }} \
+            -t $IMAGE:latest \
+            --push .
+
+      # 5) Deploy to Oracle Cloud (median2-dev)
+      - name: Deploy to Oracle Cloud
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.DO_HOST }}      # Droplet IP address (from secrets)
-          username: ${{ secrets.DO_USER }}  # SSH user (from secrets)
-          key: ${{ secrets.DO_SSH_KEY }}    # SSH private key (from secrets)
-          port: 22222                       # Change if using a different SSH port
+          host: ${{ secrets.ORACLE_HOST }}       # Oracle VM IP (79.72.24.133)
+          username: ${{ secrets.ORACLE_USER }}   # SSH user (mmd)
+          key: ${{ secrets.ORACLE_SSH_KEY }}     # SSH private key
+          port: 22222                            # SSH port
           script: |
-            cd /root/n8n-docker-caddy
-            git pull origin main
+            cd ~/n8n-stack
             docker compose pull healthyremote
             docker compose up -d healthyremote
+            docker compose restart caddy
             # Remove orphaned images older than 24h
             docker image prune -f --filter="until=24h"
