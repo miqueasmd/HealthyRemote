@@ -146,6 +146,17 @@ If you have a `docker-compose.yml` file, you can start the application with:
 Then access the app at `http://localhost:8501`.
 
 ## Deployment
+
+### Automatic Deployment to Oracle Cloud (Production)
+The application is automatically deployed to the production server (`apphealthyremote.mmdlab.tech`) via GitHub Actions.
+
+**Workflow:**
+1. Push to `main` branch.
+2. GitHub Action builds multi-arch Docker image (`amd64` / `arm64`).
+3. Image is pushed to GitHub Container Registry (GHCR).
+4. Workflow connects to Oracle VM via SSH to pull the new image and restart the container.
+
+### Manual Deployment (Streamlit Cloud)
 To deploy the application to Streamlit Cloud:
 1. Push your code to GitHub
 2. Go to the Streamlit Cloud dashboard

@@ -46,9 +46,9 @@ jobs:
       - name: Deploy to Oracle Cloud
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.ORACLE_HOST }}       # Oracle VM IP (79.72.24.133)
-          username: ${{ secrets.ORACLE_USER }}   # SSH user (mmd)
-          key: ${{ secrets.ORACLE_SSH_KEY }}     # SSH private key
+          host: ${{ secrets.DO_HOST }}           # Oracle VM IP (79.72.24.133)
+          username: ${{ secrets.DO_USER }}       # SSH user (mmd)
+          key: ${{ secrets.DO_SSH_KEY }}         # SSH private key
           port: 22222                            # SSH port
           script: |
             cd ~/n8n-stack
