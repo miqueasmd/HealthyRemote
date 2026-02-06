@@ -150,11 +150,10 @@ Then access the app at `http://localhost:8501`.
 ### Automatic Deployment to Oracle Cloud (Production)
 The application is automatically deployed to the production server (`apphealthyremote.mmdlab.tech`) via GitHub Actions.
 
-**Workflow:**
-1. Push to `main` branch.
-2. GitHub Action builds multi-arch Docker image (`amd64` / `arm64`).
-3. Image is pushed to GitHub Container Registry (GHCR).
-4. Workflow connects to Oracle VM via SSH to pull the new image and restart the container.
+**Deployment Workflow:**
+1.  **Push to `main`**: Commits to the main branch trigger the deployment workflow.
+2.  **Build & Push**: The [deploy.yml](.github/workflows/deploy.yml) workflow builds a multi-architecture Docker image (`linux/amd64`, `linux/arm64`) and pushes it to GitHub Container Registry (GHCR).
+3.  **Deploy**: The workflow connects to the Oracle VM via SSH, pulls the new image, and restarts the `healthyremote` service within the existing Docker stack.
 
 ### Manual Deployment (Streamlit Cloud)
 To deploy the application to Streamlit Cloud:
